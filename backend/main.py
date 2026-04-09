@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import bcrypt
+import time
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
@@ -12,6 +13,35 @@ from app.routers import auth, organizations, users, classrooms, teachers, studen
 from app.routers.views import calendar, teacher_view, student_view, classroom_view
 from app.models.user import User, UserRole
 from app.models.organization import Organization
+
+
+def wait_for_db(max_retries=30, retry_interval=2):
+    """等待数据库就绪"""
+    import pymysql
+    from urllib.parse import urlparse
+
+    # 解析数据库连接
+    parsed = urlparse(settings.DATABASE_URL.replace("mysql+pymysql://", "mysql://"))
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 3306
+
+    for i in range(max_retries):
+        try:
+            conn = pymysql.connect(
+                host=host,
+                port=port,
+                user=parsed.username,
+                password=parsed.password,
+                connect_timeout=5
+            )
+            conn.close()
+            print(f"数据库连接成功: {host}:{port}")
+            return True
+        except Exception as e:
+            print(f"等待数据库就绪... ({i+1}/{max_retries}): {e}")
+            time.sleep(retry_interval)
+
+    raise Exception("数据库连接超时")
 
 
 def init_default_data():
@@ -58,12 +88,15 @@ def init_default_data():
             print("默认用户创建完成: admin/admin123, org_admin/org123")
     except Exception as e:
         print(f"初始化数据失败: {e}")
+        db.rollback()
     finally:
         db.close()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 等待数据库就绪
+    wait_for_db()
     # 启动时创建数据库表
     Base.metadata.create_all(bind=engine)
     # 初始化默认数据
