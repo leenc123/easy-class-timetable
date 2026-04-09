@@ -143,7 +143,7 @@ const checkinRules = {
 }
 
 const fetchTeachers = async () => {
-  const res = await teacherApi.getList({ page_size: 1000 })
+  const res = await teacherApi.getList({ page: 1, page_size: 100 })
   teacherOptions.value = res.data || []
 }
 

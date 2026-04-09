@@ -191,10 +191,10 @@ const getStatusText = (status) => {
 
 const fetchOptions = async () => {
   const [courses, teachers, classrooms, students, slots] = await Promise.all([
-    courseApi.getList({ page_size: 1000 }),
-    teacherApi.getList({ page_size: 1000 }),
-    classroomApi.getList({ page_size: 1000 }),
-    studentApi.getList({ page_size: 1000 }),
+    courseApi.getList({ page: 1, page_size: 100 }),
+    teacherApi.getList({ page: 1, page_size: 100 }),
+    classroomApi.getList({ page: 1, page_size: 100 }),
+    studentApi.getList({ page: 1, page_size: 100 }),
     cycleApi.getTimeSlots(userStore.user?.org_id)
   ])
   courseOptions.value = courses.data || []
