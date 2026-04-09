@@ -25,7 +25,7 @@ class User(Base):
     real_name = Column(String(100), nullable=False, comment="真实姓名")
     phone = Column(String(20), comment="手机号")
     email = Column(String(100), comment="邮箱")
-    role = Column(SQLEnum(UserRole), nullable=False, default=UserRole.TEACHER, comment="角色")
+    role = Column(SQLEnum(UserRole, native_enum=False, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=UserRole.TEACHER, comment="角色")
     avatar_url = Column(String(500), comment="头像URL")
     is_active = Column(Boolean, default=True, comment="是否启用")
     last_login_at = Column(TIMESTAMP, comment="最后登录时间")

@@ -27,7 +27,7 @@ class Course(Base):
     max_students = Column(Integer, default=30, comment="最多学生数")
     required_equipment = Column(JSON, comment="所需设备")
     description = Column(String(500), comment="描述")
-    status = Column(SQLEnum(CourseStatus), default=CourseStatus.ACTIVE, comment="状态")
+    status = Column(SQLEnum(CourseStatus, native_enum=False, values_callable=lambda obj: [e.value for e in obj]), default=CourseStatus.ACTIVE, comment="状态")
     created_at = Column(TIMESTAMP, server_default=func.now(), comment="创建时间")
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), comment="更新时间")
 

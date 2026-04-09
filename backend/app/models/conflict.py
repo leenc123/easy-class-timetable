@@ -21,7 +21,7 @@ class SchedulingConflict(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     org_id = Column(BigInteger, ForeignKey("organizations.id"), nullable=False)
     session_id = Column(BigInteger, ForeignKey("class_sessions.id"), comment="课程实例ID")
-    conflict_type = Column(SQLEnum(ConflictType), nullable=False, comment="冲突类型")
+    conflict_type = Column(SQLEnum(ConflictType, native_enum=False, values_callable=lambda obj: [e.value for e in obj]), nullable=False, comment="冲突类型")
     conflicting_resource_type = Column(String(50), nullable=False, comment="冲突资源类型")
     conflicting_resource_id = Column(BigInteger, nullable=False, comment="冲突资源ID")
     conflicting_session_id = Column(BigInteger, comment="冲突的课程实例ID")

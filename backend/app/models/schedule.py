@@ -27,7 +27,7 @@ class ClassSession(Base):
     cycle_day = Column(Integer, comment="周期中的第几天")
     session_date = Column(Date, nullable=False, comment="上课日期")
     time_slot_id = Column(BigInteger, ForeignKey("time_slots.id"), nullable=False, comment="时间段ID")
-    status = Column(SQLEnum(SessionStatus), default=SessionStatus.SCHEDULED, comment="状态")
+    status = Column(SQLEnum(SessionStatus, native_enum=False, values_callable=lambda obj: [e.value for e in obj]), default=SessionStatus.SCHEDULED, comment="状态")
     notes = Column(Text, comment="备注")
     created_at = Column(TIMESTAMP, server_default=func.now(), comment="创建时间")
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now(), comment="更新时间")
