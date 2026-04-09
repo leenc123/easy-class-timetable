@@ -223,8 +223,8 @@ const fetchData = async () => {
 
 const fetchOptions = async () => {
   const [teachers, students] = await Promise.all([
-    teacherApi.getList({ page: 1, page_size: 1000 }),
-    studentApi.getList({ page: 1, page_size: 1000 })
+    teacherApi.getList({ page: 1, page_size: 100 }),
+    studentApi.getList({ page: 1, page_size: 100 })
   ])
   teacherOptions.value = teachers.data || []
   studentOptions.value = students.data || []
