@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m venv venv)",
+      "Bash(venv\\\\Scripts\\\\pip install:*)",
+      "Bash(./venv/Scripts/pip.exe install:*)",
+      "Bash(./venv/Scripts/python.exe -m uvicorn main:app --reload --host 0.0.0.0 --port 8000)",
+      "Bash(mysql:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(./venv/Scripts/python.exe scripts/init_db.py)"
+    ]
+  }
+}
