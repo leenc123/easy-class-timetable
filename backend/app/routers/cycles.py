@@ -56,7 +56,11 @@ async def create_cycle(
     db: Session = Depends(get_db)
 ):
     """创建排课周期"""
-    org_id = current_user.org_id if current_user.role != UserRole.SUPER_ADMIN else request.org_id
+    # 确定机构ID
+    if current_user.role == UserRole.SUPER_ADMIN:
+        org_id = request.org_id
+    else:
+        org_id = current_user.org_id
 
     if not org_id:
         raise HTTPException(status_code=400, detail="需要指定机构ID")
@@ -183,14 +187,21 @@ async def create_time_slot(
     db: Session = Depends(get_db)
 ):
     """创建时间段"""
-    org_id = current_user.org_id if current_user.role != UserRole.SUPER_ADMIN else request.org_id
+    # 确定机构ID
+    if current_user.role == UserRole.SUPER_ADMIN:
+        org_id = request.org_id
+    else:
+        org_id = current_user.org_id
 
     if not org_id:
         raise HTTPException(status_code=400, detail="需要指定机构ID")
 
     slot = TimeSlot(
         org_id=org_id,
-        **request.model_dump()
+        name=request.name,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        display_order=request.display_order
     )
     db.add(slot)
     db.commit()

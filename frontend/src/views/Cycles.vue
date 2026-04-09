@@ -65,6 +65,17 @@
     <!-- 周期编辑弹窗 -->
     <el-dialog v-model="cycleDialogVisible" :title="isEditCycle ? '编辑周期' : '新增周期'" width="450px">
       <el-form ref="cycleFormRef" :model="cycleForm" :rules="cycleRules" label-width="80px">
+        <!-- 超管创建时显示机构选择 -->
+        <el-form-item v-if="isSuperAdmin && !isEditCycle" label="所属机构" prop="org_id">
+          <el-select v-model="cycleForm.org_id" placeholder="请选择机构" style="width: 100%" :loading="orgLoading">
+            <el-option
+              v-for="org in orgList"
+              :key="org.id"
+              :label="org.name"
+              :value="org.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="名称" prop="name">
           <el-input v-model="cycleForm.name" placeholder="如：7天循环、10天循环" />
         </el-form-item>
@@ -103,6 +114,17 @@
     <!-- 时间段编辑弹窗 -->
     <el-dialog v-model="timeSlotDialogVisible" :title="isEditTimeSlot ? '编辑时间段' : '新增时间段'" width="400px">
       <el-form ref="timeSlotFormRef" :model="timeSlotForm" :rules="timeSlotRules" label-width="80px">
+        <!-- 超管创建时显示机构选择 -->
+        <el-form-item v-if="isSuperAdmin && !isEditTimeSlot" label="所属机构" prop="org_id">
+          <el-select v-model="timeSlotForm.org_id" placeholder="请选择机构" style="width: 100%" :loading="orgLoading">
+            <el-option
+              v-for="org in orgList"
+              :key="org.id"
+              :label="org.name"
+              :value="org.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="名称" prop="name">
           <el-input v-model="timeSlotForm.name" placeholder="如：第1节、早读" />
         </el-form-item>
@@ -125,15 +147,22 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { cycleApi } from '@/api/schedule'
+import { organizationApi } from '@/api/organization'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
+const isSuperAdmin = computed(() => userStore.user?.role === 'super_admin')
+
 const loading = ref(false)
 const submitLoading = ref(false)
+
+// 机构相关
+const orgList = ref([])
+const orgLoading = ref(false)
 
 const cycleList = ref([])
 const timeSlotList = ref([])
@@ -151,6 +180,7 @@ const timeSlotFormRef = ref()
 
 const cycleForm = reactive({
   id: null,
+  org_id: null,
   name: '',
   cycle_days: 7,
   start_date: '',
@@ -160,6 +190,7 @@ const cycleForm = reactive({
 
 const timeSlotForm = reactive({
   id: null,
+  org_id: null,
   name: '',
   start_time: '',
   end_time: '',
@@ -169,19 +200,33 @@ const timeSlotForm = reactive({
 const cycleRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   cycle_days: [{ required: true, message: '请输入天数', trigger: 'blur' }],
-  start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }]
+  start_date: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
+  org_id: [{ required: true, message: '请选择所属机构', trigger: 'change' }]
 }
 
 const timeSlotRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   start_time: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  end_time: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
+  end_time: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
+  org_id: [{ required: true, message: '请选择所属机构', trigger: 'change' }]
+}
+
+// 获取机构列表（超管使用）
+const fetchOrgList = async () => {
+  if (!isSuperAdmin.value) return
+  orgLoading.value = true
+  try {
+    const res = await organizationApi.getList({ page: 1, page_size: 100 })
+    orgList.value = res.data || []
+  } finally {
+    orgLoading.value = false
+  }
 }
 
 const fetchCycles = async () => {
   loading.value = true
   try {
-    const res = await cycleApi.getList({ page_size: 100 })
+    const res = await cycleApi.getList({ page: 1, page_size: 100 })
     cycleList.value = res.data || []
   } finally {
     loading.value = false
@@ -196,6 +241,7 @@ const fetchTimeSlots = async () => {
 
 const handleAddCycle = () => {
   cycleForm.id = null
+  cycleForm.org_id = null
   cycleForm.name = ''
   cycleForm.cycle_days = 7
   cycleForm.start_date = ''
@@ -236,10 +282,15 @@ const submitCycle = async () => {
   await cycleFormRef.value.validate()
   submitLoading.value = true
   try {
+    const submitData = { ...cycleForm }
+    if (!isSuperAdmin.value) {
+      delete submitData.org_id
+    }
+
     if (isEditCycle.value) {
-      await cycleApi.update(cycleForm.id, cycleForm)
+      await cycleApi.update(cycleForm.id, submitData)
     } else {
-      await cycleApi.create(cycleForm)
+      await cycleApi.create(submitData)
     }
     ElMessage.success('保存成功')
     cycleDialogVisible.value = false
@@ -251,6 +302,7 @@ const submitCycle = async () => {
 
 const handleAddTimeSlot = () => {
   timeSlotForm.id = null
+  timeSlotForm.org_id = null
   timeSlotForm.name = ''
   timeSlotForm.start_time = ''
   timeSlotForm.end_time = ''
@@ -269,10 +321,15 @@ const submitTimeSlot = async () => {
   await timeSlotFormRef.value.validate()
   submitLoading.value = true
   try {
+    const submitData = { ...timeSlotForm }
+    if (!isSuperAdmin.value) {
+      delete submitData.org_id
+    }
+
     if (isEditTimeSlot.value) {
-      await cycleApi.updateTimeSlot(timeSlotForm.id, timeSlotForm)
+      await cycleApi.updateTimeSlot(timeSlotForm.id, submitData)
     } else {
-      await cycleApi.createTimeSlot(timeSlotForm)
+      await cycleApi.createTimeSlot(submitData)
     }
     ElMessage.success('保存成功')
     timeSlotDialogVisible.value = false
@@ -285,5 +342,6 @@ const submitTimeSlot = async () => {
 onMounted(() => {
   fetchCycles()
   fetchTimeSlots()
+  fetchOrgList()
 })
 </script>

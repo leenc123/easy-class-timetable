@@ -129,9 +129,9 @@ const fetchData = async () => {
 
     // 获取统计数据
     const [teachers, students, courses] = await Promise.all([
-      teacherApi.getList({ page_size: 1 }),
-      studentApi.getList({ page_size: 1 }),
-      courseApi.getList({ page_size: 1 })
+      teacherApi.getList({ page: 1, page_size: 1 }),
+      studentApi.getList({ page: 1, page_size: 1 }),
+      courseApi.getList({ page: 1, page_size: 1 })
     ])
 
     stats.teacherCount = teachers.total || 0

@@ -8,6 +8,7 @@ from datetime import datetime, date
 
 # ============ 排课周期 ============
 class CycleCreate(BaseModel):
+    org_id: Optional[int] = None  # 超管创建时指定机构
     name: str = Field(..., max_length=100)
     cycle_days: int = Field(..., ge=1, le=365)
     start_date: date
@@ -52,6 +53,7 @@ class CycleDateResponse(BaseModel):
 
 # ============ 时间段 ============
 class TimeSlotCreate(BaseModel):
+    org_id: Optional[int] = None  # 超管创建时指定机构
     name: str = Field(..., max_length=50)
     start_time: str = Field(..., pattern=r"^\d{2}:\d{2}$")
     end_time: str = Field(..., pattern=r"^\d{2}:\d{2}$")
