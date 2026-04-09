@@ -67,14 +67,25 @@ async def create_course(
     db: Session = Depends(get_db)
 ):
     """创建课程"""
-    org_id = current_user.org_id if current_user.role != UserRole.SUPER_ADMIN else request.org_id
+    # 确定机构ID
+    if current_user.role == UserRole.SUPER_ADMIN:
+        org_id = request.org_id
+    else:
+        org_id = current_user.org_id
 
     if not org_id:
         raise HTTPException(status_code=400, detail="需要指定机构ID")
 
     course = Course(
         org_id=org_id,
-        **request.model_dump(exclude={"org_id"})
+        name=request.name,
+        code=request.code,
+        subject=request.subject,
+        duration_minutes=request.duration_minutes,
+        min_students=request.min_students,
+        max_students=request.max_students,
+        required_equipment=request.required_equipment,
+        description=request.description
     )
     db.add(course)
     db.commit()

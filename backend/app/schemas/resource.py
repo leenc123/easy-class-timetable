@@ -8,6 +8,7 @@ from datetime import datetime, time, date
 
 # ============ 教室 ============
 class ClassroomCreate(BaseModel):
+    org_id: Optional[int] = None  # 超管创建时指定机构
     name: str = Field(..., max_length=100)
     code: Optional[str] = None
     capacity: int = Field(default=30, ge=1)
@@ -45,6 +46,7 @@ class ClassroomResponse(BaseModel):
 
 # ============ 教师 ============
 class TeacherCreate(BaseModel):
+    org_id: Optional[int] = None  # 超管创建时指定机构
     name: str = Field(..., max_length=100)
     phone: Optional[str] = None
     email: Optional[str] = None
@@ -105,6 +107,7 @@ class AvailabilityResponse(BaseModel):
 
 # ============ 学生 ============
 class StudentCreate(BaseModel):
+    org_id: Optional[int] = None  # 超管创建时指定机构
     name: str = Field(..., max_length=100)
     grade: Optional[str] = None
     phone: Optional[str] = None
@@ -143,6 +146,7 @@ class StudentResponse(BaseModel):
 
 # ============ 课程 ============
 class CourseCreate(BaseModel):
+    org_id: Optional[int] = None  # 超管创建时指定机构
     name: str = Field(..., max_length=200)
     code: Optional[str] = None
     subject: str = Field(..., max_length=50)

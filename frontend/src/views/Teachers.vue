@@ -50,6 +50,17 @@
     <!-- 编辑弹窗 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑教师' : '新增教师'" width="500px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <!-- 超管创建时显示机构选择 -->
+        <el-form-item v-if="isSuperAdmin && !isEdit" label="所属机构" prop="org_id">
+          <el-select v-model="form.org_id" placeholder="请选择机构" style="width: 100%" :loading="orgLoading">
+            <el-option
+              v-for="org in orgList"
+              :key="org.id"
+              :label="org.name"
+              :value="org.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="姓名" prop="name">
           <el-input v-model="form.name" placeholder="请输入教师姓名" />
         </el-form-item>
@@ -119,10 +130,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { teacherApi } from '@/api/resource'
+import { organizationApi } from '@/api/organization'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+const isSuperAdmin = computed(() => userStore.user?.role === 'super_admin')
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -132,6 +148,10 @@ const isEdit = ref(false)
 const tableData = ref([])
 const formRef = ref()
 const currentTeacherId = ref(null)
+
+// 机构相关
+const orgList = ref([])
+const orgLoading = ref(false)
 
 const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
@@ -143,6 +163,7 @@ const pagination = reactive({
 
 const form = reactive({
   id: null,
+  org_id: null,
   name: '',
   phone: '',
   email: '',
@@ -160,11 +181,13 @@ const newAvailability = reactive({
 })
 
 const rules = {
-  name: [{ required: true, message: '请输入教师姓名', trigger: 'blur' }]
+  name: [{ required: true, message: '请输入教师姓名', trigger: 'blur' }],
+  org_id: [{ required: true, message: '请选择所属机构', trigger: 'change' }]
 }
 
 const resetForm = () => {
   form.id = null
+  form.org_id = null
   form.name = ''
   form.phone = ''
   form.email = ''
@@ -173,6 +196,18 @@ const resetForm = () => {
   form.bio = ''
   form.create_user_account = false
   formRef.value?.resetFields()
+}
+
+// 获取机构列表（超管使用）
+const fetchOrgList = async () => {
+  if (!isSuperAdmin.value) return
+  orgLoading.value = true
+  try {
+    const res = await organizationApi.getList({ page: 1, page_size: 100 })
+    orgList.value = res.data || []
+  } finally {
+    orgLoading.value = false
+  }
 }
 
 const fetchData = async () => {
@@ -235,10 +270,15 @@ const handleSubmit = async () => {
   await formRef.value.validate()
   submitLoading.value = true
   try {
+    const submitData = { ...form }
+    if (!isSuperAdmin.value) {
+      delete submitData.org_id
+    }
+
     if (isEdit.value) {
-      await teacherApi.update(form.id, form)
+      await teacherApi.update(form.id, submitData)
     } else {
-      await teacherApi.create(form)
+      await teacherApi.create(submitData)
     }
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
@@ -250,5 +290,6 @@ const handleSubmit = async () => {
 
 onMounted(() => {
   fetchData()
+  fetchOrgList()
 })
 </script>

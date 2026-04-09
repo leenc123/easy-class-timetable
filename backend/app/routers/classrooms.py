@@ -57,15 +57,21 @@ async def create_classroom(
     """创建教室"""
     # 获取机构ID
     if current_user.role == UserRole.SUPER_ADMIN:
-        if not request.org_id:
-            raise HTTPException(status_code=400, detail="需要指定机构ID")
         org_id = request.org_id
     else:
         org_id = current_user.org_id
 
+    if not org_id:
+        raise HTTPException(status_code=400, detail="需要指定机构ID")
+
     classroom = Classroom(
         org_id=org_id,
-        **request.model_dump()
+        name=request.name,
+        code=request.code,
+        capacity=request.capacity,
+        location=request.location,
+        equipment=request.equipment,
+        description=request.description
     )
     db.add(classroom)
     db.commit()

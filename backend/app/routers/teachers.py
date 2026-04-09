@@ -55,7 +55,11 @@ async def create_teacher(
     db: Session = Depends(get_db)
 ):
     """创建教师"""
-    org_id = current_user.org_id if current_user.role != UserRole.SUPER_ADMIN else request.org_id
+    # 确定机构ID
+    if current_user.role == UserRole.SUPER_ADMIN:
+        org_id = request.org_id
+    else:
+        org_id = current_user.org_id
 
     if not org_id:
         raise HTTPException(status_code=400, detail="需要指定机构ID")
@@ -80,7 +84,12 @@ async def create_teacher(
     teacher = Teacher(
         org_id=org_id,
         user_id=user_id,
-        **request.model_dump(exclude={"create_user_account", "org_id"})
+        name=request.name,
+        phone=request.phone,
+        email=request.email,
+        subjects=request.subjects,
+        max_hours_per_week=request.max_hours_per_week,
+        bio=request.bio
     )
     db.add(teacher)
     db.commit()

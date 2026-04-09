@@ -48,6 +48,17 @@
     <!-- 编辑弹窗 -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑课程' : '新增课程'" width="500px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <!-- 超管创建时显示机构选择 -->
+        <el-form-item v-if="isSuperAdmin && !isEdit" label="所属机构" prop="org_id">
+          <el-select v-model="form.org_id" placeholder="请选择机构" style="width: 100%" :loading="orgLoading">
+            <el-option
+              v-for="org in orgList"
+              :key="org.id"
+              :label="org.name"
+              :value="org.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="课程名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入课程名称" />
         </el-form-item>
@@ -119,10 +130,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { courseApi, teacherApi, studentApi } from '@/api/resource'
+import { organizationApi } from '@/api/organization'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+const isSuperAdmin = computed(() => userStore.user?.role === 'super_admin')
 
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -138,6 +154,10 @@ const studentOptions = ref([])
 const selectedTeachers = ref([])
 const selectedStudents = ref([])
 
+// 机构相关
+const orgList = ref([])
+const orgLoading = ref(false)
+
 const pagination = reactive({
   page: 1,
   pageSize: 20,
@@ -146,6 +166,7 @@ const pagination = reactive({
 
 const form = reactive({
   id: null,
+  org_id: null,
   name: '',
   code: '',
   subject: '',
@@ -157,11 +178,13 @@ const form = reactive({
 
 const rules = {
   name: [{ required: true, message: '请输入课程名称', trigger: 'blur' }],
-  subject: [{ required: true, message: '请选择科目', trigger: 'change' }]
+  subject: [{ required: true, message: '请选择科目', trigger: 'change' }],
+  org_id: [{ required: true, message: '请选择所属机构', trigger: 'change' }]
 }
 
 const resetForm = () => {
   form.id = null
+  form.org_id = null
   form.name = ''
   form.code = ''
   form.subject = ''
@@ -170,6 +193,18 @@ const resetForm = () => {
   form.max_students = 30
   form.description = ''
   formRef.value?.resetFields()
+}
+
+// 获取机构列表（超管使用）
+const fetchOrgList = async () => {
+  if (!isSuperAdmin.value) return
+  orgLoading.value = true
+  try {
+    const res = await organizationApi.getList({ page: 1, page_size: 100 })
+    orgList.value = res.data || []
+  } finally {
+    orgLoading.value = false
+  }
 }
 
 const fetchData = async () => {
@@ -254,10 +289,15 @@ const handleSubmit = async () => {
   await formRef.value.validate()
   submitLoading.value = true
   try {
+    const submitData = { ...form }
+    if (!isSuperAdmin.value) {
+      delete submitData.org_id
+    }
+
     if (isEdit.value) {
-      await courseApi.update(form.id, form)
+      await courseApi.update(form.id, submitData)
     } else {
-      await courseApi.create(form)
+      await courseApi.create(submitData)
     }
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
@@ -269,5 +309,6 @@ const handleSubmit = async () => {
 
 onMounted(() => {
   fetchData()
+  fetchOrgList()
 })
 </script>
