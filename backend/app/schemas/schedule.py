@@ -100,6 +100,7 @@ class SessionUpdate(BaseModel):
     session_date: Optional[date] = None
     time_slot_id: Optional[int] = None
     status: Optional[str] = None
+    student_ids: Optional[List[int]] = None
     notes: Optional[str] = None
 
 

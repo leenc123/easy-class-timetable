@@ -187,14 +187,39 @@ async def update_session(
                 message="排课冲突，无法更新"
             )
 
-    for key, value in request.model_dump(exclude_unset=True).items():
+    # 更新基本字段
+    update_data = request.model_dump(exclude_unset=True, exclude={"student_ids"})
+    for key, value in update_data.items():
         setattr(session, key, value)
+
+    # 更新学生列表
+    if request.student_ids is not None:
+        from app.models.schedule import StudentAttendance
+        # 删除旧的学生记录
+        db.query(StudentAttendance).filter(StudentAttendance.session_id == session_id).delete()
+        # 添加新的学生记录
+        for student_id in request.student_ids:
+            attendance = StudentAttendance(
+                session_id=session_id,
+                student_id=student_id
+            )
+            db.add(attendance)
 
     db.commit()
     db.refresh(session)
 
+    # 构建响应
+    session_data = SessionResponse.model_validate(session)
+    session_data.course_name = session.course.name if session.course else None
+    session_data.teacher_name = session.teacher.name if session.teacher else None
+    session_data.classroom_name = session.classroom.name if session.classroom else None
+    session_data.time_slot_name = session.time_slot.name if session.time_slot else None
+    session_data.start_time = session.time_slot.start_time if session.time_slot else None
+    session_data.end_time = session.time_slot.end_time if session.time_slot else None
+    session_data.student_count = len(session.student_attendances) if session.student_attendances else 0
+
     return ResponseBase(
-        data=SessionResponse.model_validate(session),
+        data=session_data,
         message="课程更新成功"
     )
 
@@ -337,6 +362,7 @@ async def batch_create_sessions(
                 notes=request.notes
             )
             db.add(session)
+            db.flush()  # 获取 session.id
 
             # 添加学生
             if request.student_ids:
