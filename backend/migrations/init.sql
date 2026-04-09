@@ -326,14 +326,10 @@ CREATE TABLE `scheduling_conflicts` (
 -- ----------------------------
 -- 插入默认机构
 INSERT INTO `organizations` (`name`, `code`, `description`) VALUES
-('示范培训机构', 'DEMO001', '系统演示机构');
+('示范培训机构', 'DEMO001', '系统演示机构') ON DUPLICATE KEY UPDATE name=name;
 
--- 插入超级管理员（密码: admin123）
-INSERT INTO `users` (`username`, `password_hash`, `real_name`, `role`) VALUES
-('admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.PqrF/FJqAqFW.C', '系统管理员', 'super_admin');
-
--- 插入机构管理员（密码: org123）
-INSERT INTO `users` (`org_id`, `username`, `password_hash`, `real_name`, `role`) VALUES
-(1, 'org_admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.PqrF/FJqAqFW.C', '机构管理员', 'org_admin');
+-- 默认用户由应用程序启动时自动创建
+-- admin / admin123 (超级管理员)
+-- org_admin / org123 (机构管理员)
 
 SET FOREIGN_KEY_CHECKS = 1;

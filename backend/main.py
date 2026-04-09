@@ -4,17 +4,70 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import bcrypt
 
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from app.routers import auth, organizations, users, classrooms, teachers, students, courses, cycles, schedule, exports, checkins
 from app.routers.views import calendar, teacher_view, student_view, classroom_view
+from app.models.user import User, UserRole
+from app.models.organization import Organization
+
+
+def init_default_data():
+    """初始化默认数据"""
+    db = SessionLocal()
+    try:
+        # 检查是否已有超级管理员
+        admin = db.query(User).filter(User.username == "admin").first()
+        if not admin:
+            # 创建默认机构
+            org = db.query(Organization).filter(Organization.code == "DEMO001").first()
+            if not org:
+                org = Organization(
+                    name="示范培训机构",
+                    code="DEMO001",
+                    description="系统演示机构"
+                )
+                db.add(org)
+                db.commit()
+                db.refresh(org)
+
+            # 创建超级管理员
+            admin_hash = bcrypt.hashpw("admin123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            admin = User(
+                username="admin",
+                password_hash=admin_hash,
+                real_name="系统管理员",
+                role=UserRole.SUPER_ADMIN
+            )
+            db.add(admin)
+
+            # 创建机构管理员
+            org_admin_hash = bcrypt.hashpw("org123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+            org_admin = User(
+                org_id=org.id,
+                username="org_admin",
+                password_hash=org_admin_hash,
+                real_name="机构管理员",
+                role=UserRole.ORG_ADMIN
+            )
+            db.add(org_admin)
+
+            db.commit()
+            print("默认用户创建完成: admin/admin123, org_admin/org123")
+    except Exception as e:
+        print(f"初始化数据失败: {e}")
+    finally:
+        db.close()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 启动时创建数据库表
     Base.metadata.create_all(bind=engine)
+    # 初始化默认数据
+    init_default_data()
     yield
     # 关闭时清理资源
 
