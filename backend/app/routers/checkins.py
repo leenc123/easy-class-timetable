@@ -17,18 +17,25 @@ router = APIRouter()
 
 def deduct_student_hours(db: Session, session: ClassSession):
     """扣除学生的学时"""
+    import logging
+    logger = logging.getLogger(__name__)
+
     # 获取课程的时长和学科
     course = session.course
     if not course:
+        logger.warning(f"Session {session.id} has no course")
         return
 
     duration_minutes = course.duration_minutes
     subject = course.subject
+    logger.info(f"Deducting hours: session={session.id}, course={course.name}, subject={subject}, duration={duration_minutes}min")
 
     # 获取该课程的学生
     attendances = db.query(StudentAttendance).filter(
         StudentAttendance.session_id == session.id
     ).all()
+
+    logger.info(f"Found {len(attendances)} student attendances for session {session.id}")
 
     for attendance in attendances:
         # 查找学生对该学科的学时配置
@@ -37,11 +44,17 @@ def deduct_student_hours(db: Session, session: ClassSession):
             StudentSubjectHours.subject == subject
         ).first()
 
-        if subject_hours and subject_hours.remaining_hours > 0:
-            # 扣除学时
-            subject_hours.remaining_hours -= duration_minutes
-            if subject_hours.remaining_hours < 0:
-                subject_hours.remaining_hours = 0
+        if subject_hours:
+            logger.info(f"Student {attendance.student_id}: subject={subject}, remaining={subject_hours.remaining_hours}, deducting={duration_minutes}")
+            if subject_hours.remaining_hours > 0:
+                subject_hours.remaining_hours -= duration_minutes
+                if subject_hours.remaining_hours < 0:
+                    subject_hours.remaining_hours = 0
+                logger.info(f"Student {attendance.student_id}: new remaining={subject_hours.remaining_hours}")
+            else:
+                logger.warning(f"Student {attendance.student_id}: no remaining hours")
+        else:
+            logger.warning(f"Student {attendance.student_id}: no subject_hours config for subject={subject}")
 
 
 @router.post("", response_model=ResponseBase[CheckinResponse])
@@ -62,13 +75,12 @@ async def create_checkin(
     existing = db.query(SessionCheckin).filter(
         SessionCheckin.session_id == request.session_id
     ).first()
+
     if existing:
         # 更新现有记录
         existing.expected_count = request.expected_count
         existing.actual_count = request.actual_count
         existing.notes = request.notes
-        db.commit()
-        db.refresh(existing)
         checkin = existing
     else:
         # 创建新记录
@@ -91,8 +103,9 @@ async def create_checkin(
         session.status = SessionStatus.COMPLETED
         deduct_student_hours(db, session)
 
+    # 统一提交所有修改
     db.commit()
-    db.refresh(checkin) if checkin.id else None
+    db.refresh(checkin)
 
     response = CheckinResponse.model_validate(checkin)
     response.teacher_name = checkin.teacher.name if checkin.teacher else None
