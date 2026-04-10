@@ -309,11 +309,20 @@ const handleSubmit = async () => {
   await formRef.value.validate()
   submitLoading.value = true
   try {
+    let res
     if (isEdit.value) {
-      await scheduleApi.update(form.id, form)
+      res = await scheduleApi.update(form.id, form)
     } else {
-      await scheduleApi.create(form)
+      res = await scheduleApi.create(form)
     }
+
+    // 检查是否有冲突
+    if (res.conflicts && res.conflicts.length > 0) {
+      conflictInfo.value = { has_conflict: true, conflicts: res.conflicts }
+      ElMessage.error(res.message || '存在排课冲突')
+      return
+    }
+
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
     fetchData()

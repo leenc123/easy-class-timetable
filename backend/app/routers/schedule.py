@@ -125,11 +125,12 @@ async def create_session(
     )
 
     if conflicts:
-        return ResponseBase(
-            success=False,
-            data={"conflicts": [c.model_dump() for c in conflicts]},
-            message="排课冲突，无法创建"
-        )
+        return {
+            "success": False,
+            "data": None,
+            "message": "排课冲突，无法创建",
+            "conflicts": [c.model_dump() for c in conflicts]
+        }
 
     # 创建课程实例
     session = ClassSession(
@@ -163,7 +164,7 @@ async def create_session(
     )
 
 
-@router.put("/{session_id}", response_model=ResponseBase[SessionResponse])
+@router.put("/{session_id}")
 async def update_session(
     session_id: int,
     request: SessionUpdate,
@@ -195,11 +196,13 @@ async def update_session(
         )
 
         if conflicts:
-            return ResponseBase(
-                success=False,
-                data={"conflicts": [c.model_dump() for c in conflicts]},
-                message="排课冲突，无法更新"
-            )
+            # 返回冲突信息，不使用强类型响应
+            return {
+                "success": False,
+                "data": None,
+                "message": "排课冲突，无法更新",
+                "conflicts": [c.model_dump() for c in conflicts]
+            }
 
     # 更新基本字段
     update_data = request.model_dump(exclude_unset=True, exclude={"student_ids"})
