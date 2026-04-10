@@ -133,6 +133,13 @@ async def update_user(
                 detail="只能管理本机构用户"
             )
 
+    # 禁止禁用超级管理员
+    if request.is_active == False and user.role == UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不能禁用超级管理员"
+        )
+
     # 更新字段
     if request.real_name is not None:
         user.real_name = request.real_name
@@ -157,7 +164,8 @@ async def update_user(
             role=user.role,
             org_id=user.org_id,
             org_name=org_name,
-            avatar_url=user.avatar_url
+            avatar_url=user.avatar_url,
+            is_active=user.is_active
         ),
         message="用户更新成功"
     )
@@ -184,6 +192,13 @@ async def delete_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="只能管理本机构用户"
             )
+
+    # 禁止禁用超级管理员
+    if user.role == UserRole.SUPER_ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="不能禁用超级管理员"
+        )
 
     # 禁用而非删除
     user.is_active = False

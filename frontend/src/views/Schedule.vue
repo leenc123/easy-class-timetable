@@ -39,41 +39,81 @@
       </el-form>
     </el-card>
 
-    <!-- 课表日历视图 -->
-    <el-card>
-      <el-table :data="tableData" v-loading="loading" stripe>
-        <el-table-column prop="session_date" label="日期" width="120" />
-        <el-table-column label="时间" width="120">
-          <template #default="{ row }">
-            {{ row.start_time }} - {{ row.end_time }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="course_name" label="课程" />
-        <el-table-column prop="teacher_name" label="教师" width="100" />
-        <el-table-column prop="classroom_name" label="教室" width="120" />
-        <el-table-column prop="student_count" label="学生数" width="80" />
-        <el-table-column prop="status" label="状态" width="80">
-          <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">取消</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <!-- 课表视图 -->
+    <el-card v-loading="loading">
+      <div v-if="groupedSessions.length === 0" class="empty-container">
+        <el-empty description="暂无课程安排" />
+      </div>
 
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @change="fetchData"
-        style="margin-top: 20px; justify-content: flex-end"
-      />
+      <div v-else class="schedule-groups">
+        <div
+          v-for="group in groupedSessions"
+          :key="group.date"
+          class="schedule-group"
+        >
+          <div class="group-header" @click="toggleGroup(group.date)">
+            <div class="header-left">
+              <el-icon class="toggle-icon" :class="{ expanded: expandedDates.has(group.date) }">
+                <ArrowRight />
+              </el-icon>
+              <span class="date-text">{{ formatDate(group.date) }}</span>
+              <span class="date-weekday">{{ getWeekday(group.date) }}</span>
+            </div>
+            <div class="header-right">
+              <el-tag type="info" size="small">{{ group.sessions.length }} 节课</el-tag>
+            </div>
+          </div>
+
+          <div v-show="expandedDates.has(group.date)" class="group-content">
+            <div class="schedule-table-wrapper">
+              <table class="schedule-table">
+                <thead>
+                  <tr>
+                    <th class="header-cell header-teacher">教师</th>
+                    <th
+                      v-for="slot in group.timeSlots"
+                      :key="slot.id"
+                      class="header-cell header-time"
+                    >
+                      <div class="time-name">{{ slot.name }}</div>
+                      <div class="time-range">{{ slot.start_time }}-{{ slot.end_time }}</div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="teacher in group.teachers" :key="teacher.id">
+                    <td class="cell-teacher">{{ teacher.name }}</td>
+                    <td
+                      v-for="slot in group.timeSlots"
+                      :key="slot.id"
+                      class="cell-content"
+                      :class="getCellClass(teacher.id, slot.id, group.sessionMap)"
+                    >
+                      <div
+                        v-if="getSession(teacher.id, slot.id, group.sessionMap)"
+                        class="session-card"
+                        :class="`session-${getSession(teacher.id, slot.id, group.sessionMap).status}`"
+                        @click="handleEdit(getSession(teacher.id, slot.id, group.sessionMap))"
+                      >
+                        <div class="course-name">{{ getSession(teacher.id, slot.id, group.sessionMap).course_name }}</div>
+                        <div class="classroom-name">{{ getSession(teacher.id, slot.id, group.sessionMap).classroom_name }}</div>
+                        <div class="student-count">{{ getSession(teacher.id, slot.id, group.sessionMap).student_count || 0 }}人</div>
+                      </div>
+                      <div
+                        v-else
+                        class="empty-cell"
+                        @click="handleAddWithParams(teacher.id, slot.id, group.date)"
+                      >
+                        <el-icon><Plus /></el-icon>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <!-- 新增/编辑弹窗 -->
@@ -143,6 +183,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowRight, Plus } from '@element-plus/icons-vue'
 import { scheduleApi, cycleApi, exportApi } from '@/api/schedule'
 import { courseApi, teacherApi, studentApi, classroomApi } from '@/api/resource'
 import { organizationApi } from '@/api/organization'
@@ -157,6 +198,9 @@ const isEdit = ref(false)
 const tableData = ref([])
 const formRef = ref()
 
+// 展开的日期
+const expandedDates = ref(new Set())
+
 // 导出机构选择
 const exportDialogVisible = ref(false)
 const exportType = ref('')
@@ -168,12 +212,6 @@ const dateRange = ref([])
 const filters = reactive({
   teacher_id: null,
   classroom_id: null
-})
-
-const pagination = reactive({
-  page: 1,
-  pageSize: 20,
-  total: 0
 })
 
 const form = reactive({
@@ -203,14 +241,73 @@ const timeSlotOptions = ref([])
 
 const conflictInfo = ref({ has_conflict: false, conflicts: [] })
 
-const getStatusType = (status) => {
-  const types = { scheduled: '', completed: 'success', cancelled: 'danger', rescheduled: 'warning' }
-  return types[status] || ''
+// 按日期分组的课表数据
+const groupedSessions = computed(() => {
+  const groups = {}
+
+  // 获取所有时间段（按开始时间排序）
+  const allTimeSlots = [...timeSlotOptions.value].sort((a, b) => a.start_time.localeCompare(b.start_time))
+
+  // 按日期分组
+  tableData.value.forEach(session => {
+    const date = session.session_date
+    if (!groups[date]) {
+      groups[date] = {
+        date,
+        sessions: [],
+        teachers: new Map(),
+        sessionMap: {},
+        timeSlots: allTimeSlots // 使用所有时间段
+      }
+    }
+    groups[date].sessions.push(session)
+
+    // 收集该日期的教师
+    if (!groups[date].teachers.has(session.teacher_id)) {
+      groups[date].teachers.set(session.teacher_id, { id: session.teacher_id, name: session.teacher_name })
+    }
+
+    // 构建映射表
+    const key = `${session.teacher_id}_${session.time_slot_id}`
+    groups[date].sessionMap[key] = session
+  })
+
+  // 转换为数组并排序
+  return Object.values(groups)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(group => ({
+      ...group,
+      teachers: Array.from(group.teachers.values()).sort((a, b) => a.name.localeCompare(b.name))
+    }))
+})
+
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr)
+  return `${date.getMonth() + 1}月${date.getDate()}日`
 }
 
-const getStatusText = (status) => {
-  const texts = { scheduled: '已安排', completed: '已完成', cancelled: '已取消', rescheduled: '已调课' }
-  return texts[status] || status
+const getWeekday = (dateStr) => {
+  const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+  return weekdays[new Date(dateStr).getDay()]
+}
+
+const toggleGroup = (date) => {
+  if (expandedDates.value.has(date)) {
+    expandedDates.value.delete(date)
+  } else {
+    expandedDates.value.add(date)
+  }
+}
+
+const getSession = (teacherId, timeSlotId, sessionMap) => {
+  const key = `${teacherId}_${timeSlotId}`
+  return sessionMap[key]
+}
+
+const getCellClass = (teacherId, timeSlotId, sessionMap) => {
+  const session = getSession(teacherId, timeSlotId, sessionMap)
+  if (!session) return ''
+  return `cell-${session.status}`
 }
 
 const fetchOptions = async () => {
@@ -232,8 +329,8 @@ const fetchData = async () => {
   loading.value = true
   try {
     const params = {
-      page: pagination.page,
-      page_size: pagination.pageSize,
+      page: 1,
+      page_size: 100,
       ...filters
     }
 
@@ -244,7 +341,9 @@ const fetchData = async () => {
 
     const res = await scheduleApi.getList(params)
     tableData.value = res.data || []
-    pagination.total = res.total || 0
+
+    // 默认展开所有日期
+    expandedDates.value = new Set(tableData.value.map(s => s.session_date))
   } finally {
     loading.value = false
   }
@@ -277,6 +376,20 @@ const handleAdd = () => {
   form.classroom_id = null
   form.session_date = ''
   form.time_slot_id = null
+  form.student_ids = []
+  form.notes = ''
+  conflictInfo.value = { has_conflict: false, conflicts: [] }
+  isEdit.value = false
+  dialogVisible.value = true
+}
+
+const handleAddWithParams = (teacherId, timeSlotId, date) => {
+  form.id = null
+  form.course_id = null
+  form.teacher_id = teacherId
+  form.classroom_id = null
+  form.session_date = date
+  form.time_slot_id = timeSlotId
   form.student_ids = []
   form.notes = ''
   conflictInfo.value = { has_conflict: false, conflicts: [] }
@@ -416,3 +529,215 @@ onMounted(() => {
   fetchData()
 })
 </script>
+
+<style scoped>
+.empty-container {
+  padding: 40px 0;
+  text-align: center;
+}
+
+.schedule-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.schedule-group {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  cursor: pointer;
+  user-select: none;
+}
+
+.group-header:hover {
+  background: #eef1f6;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-icon {
+  transition: transform 0.3s;
+  color: #909399;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.date-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.date-weekday {
+  font-size: 14px;
+  color: #909399;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.group-content {
+  padding: 16px;
+}
+
+.schedule-table-wrapper {
+  overflow-x: auto;
+}
+
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  min-width: 500px;
+}
+
+.header-cell {
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  padding: 10px 8px;
+  text-align: center;
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-teacher {
+  width: 80px;
+}
+
+.header-time {
+  min-width: 100px;
+}
+
+.time-name {
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.time-range {
+  font-size: 11px;
+  color: #909399;
+  font-weight: normal;
+}
+
+.cell-teacher {
+  border: 1px solid #ebeef5;
+  padding: 6px;
+  text-align: center;
+  font-weight: 500;
+  color: #303133;
+  background: #fafafa;
+}
+
+.cell-content {
+  border: 1px solid #ebeef5;
+  padding: 4px;
+  min-height: 70px;
+  vertical-align: top;
+}
+
+.cell-scheduled {
+  background: #ecf5ff;
+}
+
+.cell-completed {
+  background: #f0f9eb;
+}
+
+.cell-cancelled {
+  background: #fef0f0;
+}
+
+.cell-rescheduled {
+  background: #fdf6ec;
+}
+
+.session-card {
+  background: #fff;
+  border-radius: 4px;
+  padding: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.session-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.course-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classroom-name {
+  font-size: 11px;
+  color: #606266;
+}
+
+.student-count {
+  font-size: 11px;
+  color: #909399;
+}
+
+.session-completed {
+  opacity: 0.8;
+}
+
+.session-cancelled {
+  opacity: 0.6;
+}
+
+.empty-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  cursor: pointer;
+  color: #c0c4cc;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.empty-cell:hover {
+  background: #f0f7ff;
+  color: #409eff;
+}
+
+@media (max-width: 768px) {
+  .schedule-table {
+    font-size: 12px;
+  }
+
+  .header-time {
+    min-width: 80px;
+  }
+
+  .course-name {
+    font-size: 12px;
+  }
+}
+</style>

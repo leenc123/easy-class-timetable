@@ -46,10 +46,28 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)" :disabled="!row.is_active">禁用</el-button>
+            <template v-if="row.role !== 'super_admin'">
+              <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+              <el-button
+                v-if="row.is_active"
+                type="danger"
+                link
+                @click="handleToggleStatus(row)"
+              >
+                禁用
+              </el-button>
+              <el-button
+                v-else
+                type="success"
+                link
+                @click="handleToggleStatus(row)"
+              >
+                启用
+              </el-button>
+            </template>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
       </el-table>
@@ -179,10 +197,18 @@ const handleEdit = (row) => {
   dialogVisible.value = true
 }
 
-const handleDelete = async (row) => {
-  await ElMessageBox.confirm('确定要禁用该用户吗？', '提示', { type: 'warning' })
-  await authApi.deleteUser(row.id)
-  ElMessage.success('已禁用')
+const handleToggleStatus = async (row) => {
+  const action = row.is_active ? '禁用' : '启用'
+
+  if (row.role === 'super_admin' && row.is_active) {
+    ElMessage.warning('不能禁用超级管理员')
+    return
+  }
+
+  await ElMessageBox.confirm(`确定要${action}该用户吗？`, '提示', { type: 'warning' })
+
+  await authApi.updateUser(row.id, { is_active: !row.is_active })
+  ElMessage.success(`已${action}`)
   fetchData()
 }
 

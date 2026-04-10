@@ -2,8 +2,8 @@
   <div class="main-layout">
     <!-- 移动端菜单按钮 -->
     <div class="mobile-header" v-if="isMobile">
-      <el-button @click="drawerVisible = true" :icon="Menu" />
       <span class="logo">{{ appTitle }}</span>
+      <el-button @click="drawerVisible = true" :icon="Menu" size="small" />
       <el-dropdown @command="handleCommand">
         <el-avatar :size="32" :icon="UserFilled" />
         <template #dropdown>
@@ -30,15 +30,10 @@
     <!-- 桌面端布局 -->
     <el-container v-else class="desktop-layout">
       <el-aside :width="isCollapsed ? '64px' : '220px'" class="sidebar">
-        <div class="logo-wrapper">
+        <div class="logo-wrapper" :class="{ 'is-collapsed': isCollapsed }">
           <span class="logo" v-show="!isCollapsed">{{ appTitle }}</span>
-          <el-icon v-show="isCollapsed" class="logo-icon"><Calendar /></el-icon>
-        </div>
-        <!-- 折叠按钮 -->
-        <div class="collapse-btn" @click="toggleCollapse">
-          <el-icon :size="20">
-            <component :is="isCollapsed ? 'Expand' : 'Fold'" />
-          </el-icon>
+          <el-icon v-show="isCollapsed" class="collapse-btn" @click="toggleCollapse" :size="18"><Expand /></el-icon>
+          <el-icon v-show="!isCollapsed" class="collapse-btn" @click="toggleCollapse" :size="18"><Fold /></el-icon>
         </div>
         <sidebar-menu :is-collapsed="isCollapsed" />
       </el-aside>
@@ -137,35 +132,34 @@ onUnmounted(() => {
   height: 60px;
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
+  padding: 0 15px;
   border-bottom: 1px solid #3a4a5b;
+  overflow: hidden;
+}
+
+.logo-wrapper.is-collapsed {
+  justify-content: center;
+}
+
+.logo-wrapper .collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #bfcbd9;
+  transition: all 0.3s;
+}
+
+.logo-wrapper .collapse-btn:hover {
+  color: #409eff;
 }
 
 .logo {
   font-size: 18px;
   font-weight: bold;
   color: #fff;
-}
-
-.logo-icon {
-  font-size: 24px;
-  color: #fff;
-}
-
-.collapse-btn {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: #bfcbd9;
-  border-bottom: 1px solid #3a4a5b;
-  transition: all 0.3s;
-}
-
-.collapse-btn:hover {
-  background-color: #263445;
-  color: #409eff;
+  white-space: nowrap;
 }
 
 .el-main {
@@ -206,9 +200,13 @@ onUnmounted(() => {
   background: #304156;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 0 15px;
   color: #fff;
+  gap: 10px;
+}
+
+.mobile-header .logo {
+  flex: 1;
 }
 
 .mobile-content {

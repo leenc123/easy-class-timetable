@@ -270,8 +270,22 @@ async def check_conflict(
     """检查排课冲突"""
     # 获取机构ID
     org_id = current_user.org_id
+
+    # 如果用户没有关联机构（超管），从教师或教室中获取
     if not org_id:
-        raise HTTPException(status_code=400, detail="用户未关联机构")
+        if request.teacher_id:
+            from app.models.teacher import Teacher
+            teacher = db.query(Teacher).filter(Teacher.id == request.teacher_id).first()
+            if teacher:
+                org_id = teacher.org_id
+        if not org_id and request.classroom_id:
+            from app.models.classroom import Classroom
+            classroom = db.query(Classroom).filter(Classroom.id == request.classroom_id).first()
+            if classroom:
+                org_id = classroom.org_id
+
+    if not org_id:
+        raise HTTPException(status_code=400, detail="无法确定机构，请选择教师或教室")
 
     # 使用统一的冲突检查服务
     conflicts = check_session_conflicts(
