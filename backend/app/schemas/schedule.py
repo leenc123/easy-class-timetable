@@ -150,6 +150,7 @@ class ConflictCheckRequest(BaseModel):
     classroom_id: Optional[int] = None
     session_date: date
     time_slot_id: int
+    student_ids: Optional[List[int]] = None
     exclude_session_id: Optional[int] = None
 
 

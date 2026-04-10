@@ -120,7 +120,8 @@ async def create_session(
         teacher_id=request.teacher_id,
         classroom_id=request.classroom_id,
         session_date=request.session_date,
-        time_slot_id=request.time_slot_id
+        time_slot_id=request.time_slot_id,
+        student_ids=request.student_ids
     )
 
     if conflicts:
@@ -178,7 +179,10 @@ async def update_session(
         raise HTTPException(status_code=403, detail="无权访问")
 
     # 如果修改了时间或资源，检查冲突
-    if request.teacher_id or request.classroom_id or request.session_date or request.time_slot_id:
+    if request.teacher_id or request.classroom_id or request.session_date or request.time_slot_id or request.student_ids:
+        # 获取最终的学生列表
+        final_student_ids = request.student_ids if request.student_ids is not None else [ss.student_id for ss in session.session_students]
+
         conflicts = check_session_conflicts(
             db=db,
             org_id=session.org_id,
@@ -186,6 +190,7 @@ async def update_session(
             classroom_id=request.classroom_id or session.classroom_id,
             session_date=request.session_date or session.session_date,
             time_slot_id=request.time_slot_id or session.time_slot_id,
+            student_ids=final_student_ids,
             exclude_session_id=session_id
         )
 
@@ -260,49 +265,22 @@ async def check_conflict(
     db: Session = Depends(get_db)
 ):
     """检查排课冲突"""
-    # 需要至少指定一个资源
-    if not request.teacher_id and not request.classroom_id:
-        raise HTTPException(status_code=400, detail="需要指定教师或教室")
+    # 获取机构ID
+    org_id = current_user.org_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="用户未关联机构")
 
-    conflicts = []
-
-    # 检查教师冲突
-    if request.teacher_id:
-        query = db.query(ClassSession).filter(
-            ClassSession.session_date == request.session_date,
-            ClassSession.time_slot_id == request.time_slot_id,
-            ClassSession.teacher_id == request.teacher_id,
-            ClassSession.status != SessionStatus.CANCELLED
-        )
-        if request.exclude_session_id:
-            query = query.filter(ClassSession.id != request.exclude_session_id)
-
-        existing = query.first()
-        if existing:
-            conflicts.append(ConflictInfo(
-                type="teacher",
-                description=f"教师在该时间段已有课程安排",
-                conflicting_session_id=existing.id
-            ))
-
-    # 检查教室冲突
-    if request.classroom_id:
-        query = db.query(ClassSession).filter(
-            ClassSession.session_date == request.session_date,
-            ClassSession.time_slot_id == request.time_slot_id,
-            ClassSession.classroom_id == request.classroom_id,
-            ClassSession.status != SessionStatus.CANCELLED
-        )
-        if request.exclude_session_id:
-            query = query.filter(ClassSession.id != request.exclude_session_id)
-
-        existing = query.first()
-        if existing:
-            conflicts.append(ConflictInfo(
-                type="classroom",
-                description=f"教室在该时间段已有课程安排",
-                conflicting_session_id=existing.id
-            ))
+    # 使用统一的冲突检查服务
+    conflicts = check_session_conflicts(
+        db=db,
+        org_id=org_id,
+        teacher_id=request.teacher_id,
+        classroom_id=request.classroom_id,
+        session_date=request.session_date,
+        time_slot_id=request.time_slot_id,
+        student_ids=request.student_ids,
+        exclude_session_id=request.exclude_session_id
+    )
 
     return ConflictResponse(
         has_conflict=len(conflicts) > 0,
@@ -347,7 +325,8 @@ async def batch_create_sessions(
                 teacher_id=request.teacher_id,
                 classroom_id=request.classroom_id,
                 session_date=current_date,
-                time_slot_id=time_slot_id
+                time_slot_id=time_slot_id,
+                student_ids=request.student_ids
             )
 
             if conflicts:

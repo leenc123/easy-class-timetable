@@ -258,16 +258,17 @@ const checkConflict = async () => {
     classroom_id: form.classroom_id,
     session_date: form.session_date,
     time_slot_id: form.time_slot_id,
+    student_ids: form.student_ids,
     exclude_session_id: form.id
   })
   conflictInfo.value = res
 }
 
-watch([() => form.teacher_id, () => form.classroom_id, () => form.session_date, () => form.time_slot_id], () => {
+watch([() => form.teacher_id, () => form.classroom_id, () => form.session_date, () => form.time_slot_id, () => form.student_ids], () => {
   if (form.session_date && form.time_slot_id) {
     checkConflict()
   }
-})
+}, { deep: true })
 
 const handleAdd = () => {
   form.id = null
