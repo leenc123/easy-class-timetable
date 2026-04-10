@@ -97,6 +97,20 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
+#### 数据库
+```bash
+#完全重置（删除数据卷）
+
+# 停止所有容器
+docker-compose down
+
+# 删除数据库数据卷
+docker volume rm easy-class-timetable_mysql_data
+
+# 重新启动（会自动初始化数据库）
+docker-compose up -d
+```
+
 #### 前端
 
 ```bash

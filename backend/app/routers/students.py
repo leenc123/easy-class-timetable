@@ -150,14 +150,14 @@ async def delete_student(
     return ResponseBase(message="学生已禁用")
 
 
-# ============ 学科学时管理 ============
+# ============ 学科课时管理 ============
 @router.get("/{student_id}/subject-hours", response_model=ResponseBase[list[StudentSubjectHoursResponse]])
 async def list_student_subject_hours(
     student_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取学生的学科学时列表"""
+    """获取学生的学科课时列表"""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
@@ -176,7 +176,7 @@ async def create_student_subject_hours(
     current_user: User = Depends(require_role([UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN])),
     db: Session = Depends(get_db)
 ):
-    """为学生添加学科学时"""
+    """为学生添加学科课时"""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
@@ -184,25 +184,25 @@ async def create_student_subject_hours(
     if not check_org_access(current_user, student.org_id):
         raise HTTPException(status_code=403, detail="无权访问")
 
-    # 检查是否已存在该学科的学时配置
+    # 检查是否已存在该学科的课时配置
     existing = db.query(StudentSubjectHours).filter(
         StudentSubjectHours.student_id == student_id,
         StudentSubjectHours.subject == request.subject
     ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="该学科已存在学时配置")
+        raise HTTPException(status_code=400, detail="该学科已存在课时配置")
 
     subject_hours = StudentSubjectHours(
         student_id=student_id,
         subject=request.subject,
-        total_hours=request.total_hours,
-        remaining_hours=request.total_hours  # 初始剩余学时等于总学时
+        total_lessons=request.total_lessons,
+        remaining_lessons=request.total_lessons  # 初始剩余课时等于总课时
     )
     db.add(subject_hours)
     db.commit()
     db.refresh(subject_hours)
 
-    return ResponseBase(data=StudentSubjectHoursResponse.model_validate(subject_hours), message="学时配置创建成功")
+    return ResponseBase(data=StudentSubjectHoursResponse.model_validate(subject_hours), message="课时配置创建成功")
 
 
 @router.put("/{student_id}/subject-hours/{hours_id}", response_model=ResponseBase[StudentSubjectHoursResponse])
@@ -213,7 +213,7 @@ async def update_student_subject_hours(
     current_user: User = Depends(require_role([UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN])),
     db: Session = Depends(get_db)
 ):
-    """更新学生的学科学时"""
+    """更新学生的学科课时"""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
@@ -226,28 +226,28 @@ async def update_student_subject_hours(
         StudentSubjectHours.student_id == student_id
     ).first()
     if not subject_hours:
-        raise HTTPException(status_code=404, detail="学时配置不存在")
+        raise HTTPException(status_code=404, detail="课时配置不存在")
 
-    # 更新总学时时，同时调整剩余学时
-    if request.total_hours is not None:
-        # 计算已使用的学时
-        used_hours = subject_hours.total_hours - subject_hours.remaining_hours
-        # 新的剩余学时 = 新总学时 - 已使用学时
-        new_remaining = request.total_hours - used_hours
+    # 更新总课时时，同时调整剩余课时
+    if request.total_lessons is not None:
+        # 计算已使用的课时
+        used_lessons = subject_hours.total_lessons - subject_hours.remaining_lessons
+        # 新的剩余课时 = 新总课时 - 已使用课时
+        new_remaining = request.total_lessons - used_lessons
         if new_remaining < 0:
-            raise HTTPException(status_code=400, detail="总学时不能小于已使用的学时")
-        subject_hours.total_hours = request.total_hours
-        subject_hours.remaining_hours = new_remaining
+            raise HTTPException(status_code=400, detail="总课时不能小于已使用的课时")
+        subject_hours.total_lessons = request.total_lessons
+        subject_hours.remaining_lessons = new_remaining
 
-    if request.remaining_hours is not None:
-        if request.remaining_hours > subject_hours.total_hours:
-            raise HTTPException(status_code=400, detail="剩余学时不能大于总学时")
-        subject_hours.remaining_hours = request.remaining_hours
+    if request.remaining_lessons is not None:
+        if request.remaining_lessons > subject_hours.total_lessons:
+            raise HTTPException(status_code=400, detail="剩余课时不能大于总课时")
+        subject_hours.remaining_lessons = request.remaining_lessons
 
     db.commit()
     db.refresh(subject_hours)
 
-    return ResponseBase(data=StudentSubjectHoursResponse.model_validate(subject_hours), message="学时配置更新成功")
+    return ResponseBase(data=StudentSubjectHoursResponse.model_validate(subject_hours), message="课时配置更新成功")
 
 
 @router.delete("/{student_id}/subject-hours/{hours_id}", response_model=ResponseBase)
@@ -257,7 +257,7 @@ async def delete_student_subject_hours(
     current_user: User = Depends(require_role([UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN])),
     db: Session = Depends(get_db)
 ):
-    """删除学生的学科学时配置"""
+    """删除学生的学科课时配置"""
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
@@ -270,9 +270,9 @@ async def delete_student_subject_hours(
         StudentSubjectHours.student_id == student_id
     ).first()
     if not subject_hours:
-        raise HTTPException(status_code=404, detail="学时配置不存在")
+        raise HTTPException(status_code=404, detail="课时配置不存在")
 
     db.delete(subject_hours)
     db.commit()
 
-    return ResponseBase(message="学时配置删除成功")
+    return ResponseBase(message="课时配置删除成功")

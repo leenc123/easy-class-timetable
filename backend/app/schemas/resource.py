@@ -212,23 +212,23 @@ class CourseStudentAssign(BaseModel):
     student_ids: List[int]
 
 
-# ============ 学生学科学时 ============
+# ============ 学生学科课时 ============
 class StudentSubjectHoursCreate(BaseModel):
     subject: str = Field(..., max_length=50)
-    total_hours: int = Field(..., ge=0, description="总学时（分钟）")
+    total_lessons: int = Field(..., ge=0, description="总课时")
 
 
 class StudentSubjectHoursUpdate(BaseModel):
-    total_hours: Optional[int] = Field(None, ge=0, description="总学时（分钟）")
-    remaining_hours: Optional[int] = Field(None, ge=0, description="剩余学时（分钟）")
+    total_lessons: Optional[int] = Field(None, ge=0, description="总课时")
+    remaining_lessons: Optional[int] = Field(None, ge=0, description="剩余课时")
 
 
 class StudentSubjectHoursResponse(BaseModel):
     id: int
     student_id: int
     subject: str
-    total_hours: int
-    remaining_hours: int
+    total_lessons: int
+    remaining_lessons: int
     created_at: datetime
     updated_at: datetime
 
@@ -237,5 +237,5 @@ class StudentSubjectHoursResponse(BaseModel):
 
 
 class StudentResponseWithHours(StudentResponse):
-    """学生响应（包含学时信息）"""
+    """学生响应（包含课时信息）"""
     subject_hours: Optional[List[StudentSubjectHoursResponse]] = None

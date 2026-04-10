@@ -73,7 +73,7 @@ export const studentApi = {
     return api.delete(`/students/${id}`)
   },
 
-  // 学科学时管理
+  // 学科课时管理
   getSubjectHours(studentId) {
     return api.get(`/students/${studentId}/subject-hours`)
   },

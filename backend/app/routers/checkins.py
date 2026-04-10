@@ -16,7 +16,7 @@ router = APIRouter()
 
 
 def deduct_student_hours(db: Session, session: ClassSession):
-    """扣除学生的学时"""
+    """扣除学生的课时（1课时=120分钟）"""
     import logging
     logger = logging.getLogger(__name__)
 
@@ -28,7 +28,14 @@ def deduct_student_hours(db: Session, session: ClassSession):
 
     duration_minutes = course.duration_minutes
     subject = course.subject
-    logger.info(f"Deducting hours: session={session.id}, course={course.name}, subject={subject}, duration={duration_minutes}min")
+
+    # 将分钟转换为课时（1课时=120分钟，向下取整，不足120分钟算0.5课时）
+    if duration_minutes >= 120:
+        lessons_to_deduct = duration_minutes // 120
+    else:
+        lessons_to_deduct = 0.5  # 不足120分钟按0.5课时扣除
+
+    logger.info(f"Deducting lessons: session={session.id}, course={course.name}, subject={subject}, duration={duration_minutes}min, lessons={lessons_to_deduct}")
 
     # 获取该课程的学生
     attendances = db.query(StudentAttendance).filter(
@@ -38,21 +45,21 @@ def deduct_student_hours(db: Session, session: ClassSession):
     logger.info(f"Found {len(attendances)} student attendances for session {session.id}")
 
     for attendance in attendances:
-        # 查找学生对该学科的学时配置
+        # 查找学生对该学科的课时配置
         subject_hours = db.query(StudentSubjectHours).filter(
             StudentSubjectHours.student_id == attendance.student_id,
             StudentSubjectHours.subject == subject
         ).first()
 
         if subject_hours:
-            logger.info(f"Student {attendance.student_id}: subject={subject}, remaining={subject_hours.remaining_hours}, deducting={duration_minutes}")
-            if subject_hours.remaining_hours > 0:
-                subject_hours.remaining_hours -= duration_minutes
-                if subject_hours.remaining_hours < 0:
-                    subject_hours.remaining_hours = 0
-                logger.info(f"Student {attendance.student_id}: new remaining={subject_hours.remaining_hours}")
+            logger.info(f"Student {attendance.student_id}: subject={subject}, remaining={subject_hours.remaining_lessons}, deducting={lessons_to_deduct}")
+            if subject_hours.remaining_lessons > 0:
+                subject_hours.remaining_lessons -= lessons_to_deduct
+                if subject_hours.remaining_lessons < 0:
+                    subject_hours.remaining_lessons = 0
+                logger.info(f"Student {attendance.student_id}: new remaining={subject_hours.remaining_lessons}")
             else:
-                logger.warning(f"Student {attendance.student_id}: no remaining hours")
+                logger.warning(f"Student {attendance.student_id}: no remaining lessons")
         else:
             logger.warning(f"Student {attendance.student_id}: no subject_hours config for subject={subject}")
 

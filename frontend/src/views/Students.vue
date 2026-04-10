@@ -100,19 +100,19 @@
       </template>
     </el-dialog>
 
-    <!-- 学时配置弹窗 -->
-    <el-dialog v-model="hoursDialogVisible" title="学时配置" width="600px">
+    <!-- 课时配置弹窗 -->
+    <el-dialog v-model="hoursDialogVisible" title="课时配置" width="600px">
       <div class="hours-header">
         <span>学生：{{ currentStudent?.name }}</span>
         <el-button type="primary" size="small" @click="handleAddHours">添加学科</el-button>
       </div>
       <el-table :data="hoursList" v-loading="hoursLoading" stripe size="small">
         <el-table-column prop="subject" label="学科" width="120" />
-        <el-table-column prop="total_hours" label="总学时(分钟)" width="120" />
-        <el-table-column prop="remaining_hours" label="剩余学时(分钟)" width="120" />
-        <el-table-column label="已用学时" width="100">
+        <el-table-column prop="total_lessons" label="总课时" width="100" />
+        <el-table-column prop="remaining_lessons" label="剩余课时" width="100" />
+        <el-table-column label="已用课时" width="100">
           <template #default="{ row }">
-            {{ row.total_hours - row.remaining_hours }}
+            {{ (row.total_lessons - row.remaining_lessons).toFixed(1) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150">
@@ -127,8 +127,8 @@
       </template>
     </el-dialog>
 
-    <!-- 学时编辑弹窗 -->
-    <el-dialog v-model="hoursEditDialogVisible" :title="isEditHours ? '编辑学时' : '添加学时'" width="400px">
+    <!-- 课时编辑弹窗 -->
+    <el-dialog v-model="hoursEditDialogVisible" :title="isEditHours ? '编辑课时' : '添加课时'" width="400px">
       <el-form ref="hoursFormRef" :model="hoursForm" :rules="hoursRules" label-width="80px">
         <el-form-item label="学科" prop="subject">
           <el-select v-model="hoursForm.subject" placeholder="请选择学科" style="width: 100%" :disabled="isEditHours">
@@ -147,8 +147,9 @@
             <el-option label="信息" value="信息" />
           </el-select>
         </el-form-item>
-        <el-form-item label="总学时" prop="total_hours">
-          <el-input-number v-model="hoursForm.total_hours" :min="0" :step="60" placeholder="请输入总学时(分钟)" />
+        <el-form-item label="总课时" prop="total_lessons">
+          <el-input-number v-model="hoursForm.total_lessons" :min="0" :step="1" :precision="1" placeholder="请输入总课时" />
+          <div class="form-tip">1课时 = 2小时（120分钟）</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -181,7 +182,7 @@ const formRef = ref()
 const orgList = ref([])
 const orgLoading = ref(false)
 
-// 学时相关
+// 课时相关
 const hoursDialogVisible = ref(false)
 const hoursEditDialogVisible = ref(false)
 const hoursLoading = ref(false)
@@ -212,7 +213,7 @@ const hoursForm = reactive({
   id: null,
   student_id: null,
   subject: '',
-  total_hours: 0
+  total_lessons: 0
 })
 
 const rules = {
@@ -222,7 +223,7 @@ const rules = {
 
 const hoursRules = {
   subject: [{ required: true, message: '请选择学科', trigger: 'change' }],
-  total_hours: [{ required: true, message: '请输入总学时', trigger: 'blur' }]
+  total_lessons: [{ required: true, message: '请输入总课时', trigger: 'blur' }]
 }
 
 const resetForm = () => {
@@ -241,7 +242,7 @@ const resetHoursForm = () => {
   hoursForm.id = null
   hoursForm.student_id = null
   hoursForm.subject = ''
-  hoursForm.total_hours = 0
+  hoursForm.total_lessons = 0
   hoursFormRef.value?.resetFields()
 }
 
@@ -314,7 +315,7 @@ const handleSubmit = async () => {
   }
 }
 
-// 学时管理
+// 课时管理
 const handleHours = async (row) => {
   currentStudent.value = row
   hoursDialogVisible.value = true
@@ -345,13 +346,13 @@ const handleEditHours = (row) => {
     id: row.id,
     student_id: currentStudent.value.id,
     subject: row.subject,
-    total_hours: row.total_hours
+    total_lessons: row.total_lessons
   })
   hoursEditDialogVisible.value = true
 }
 
 const handleDeleteHours = async (row) => {
-  await ElMessageBox.confirm('确定要删除该学科学时配置吗？', '提示', { type: 'warning' })
+  await ElMessageBox.confirm('确定要删除该学科课时配置吗？', '提示', { type: 'warning' })
   await studentApi.deleteSubjectHours(currentStudent.value.id, row.id)
   ElMessage.success('删除成功')
   fetchHoursList(currentStudent.value.id)
@@ -363,12 +364,12 @@ const handleSubmitHours = async () => {
   try {
     if (isEditHours.value) {
       await studentApi.updateSubjectHours(currentStudent.value.id, hoursForm.id, {
-        total_hours: hoursForm.total_hours
+        total_lessons: hoursForm.total_lessons
       })
     } else {
       await studentApi.createSubjectHours(currentStudent.value.id, {
         subject: hoursForm.subject,
-        total_hours: hoursForm.total_hours
+        total_lessons: hoursForm.total_lessons
       })
     }
     ElMessage.success(isEditHours.value ? '更新成功' : '添加成功')
@@ -391,5 +392,11 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style>
