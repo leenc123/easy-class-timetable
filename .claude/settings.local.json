@@ -13,7 +13,9 @@
       "Bash(python3 -m py_compile app/models/student_subject_hours.py)",
       "Bash(python -m py_compile backend/app/models/student_subject_hours.py)",
       "Bash(python -m py_compile backend/app/routers/students.py)",
-      "Bash(python -m py_compile backend/app/routers/checkins.py)"
+      "Bash(python -m py_compile backend/app/routers/checkins.py)",
+      "Bash(python -m py_compile app/routers/students.py)",
+      "Bash(docker-compose restart:*)"
     ]
   }
 }

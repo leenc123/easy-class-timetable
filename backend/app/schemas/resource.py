@@ -215,20 +215,20 @@ class CourseStudentAssign(BaseModel):
 # ============ 学生学科课时 ============
 class StudentSubjectHoursCreate(BaseModel):
     subject: str = Field(..., max_length=50)
-    total_lessons: int = Field(..., ge=0, description="总课时")
+    total_lessons: float = Field(..., ge=0, description="总课时")
 
 
 class StudentSubjectHoursUpdate(BaseModel):
-    total_lessons: Optional[int] = Field(None, ge=0, description="总课时")
-    remaining_lessons: Optional[int] = Field(None, ge=0, description="剩余课时")
+    total_lessons: Optional[float] = Field(None, ge=0, description="总课时")
+    remaining_lessons: Optional[float] = Field(None, ge=0, description="剩余课时")
 
 
 class StudentSubjectHoursResponse(BaseModel):
     id: int
     student_id: int
     subject: str
-    total_lessons: int
-    remaining_lessons: int
+    total_lessons: float
+    remaining_lessons: float
     created_at: datetime
     updated_at: datetime
 
