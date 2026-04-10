@@ -15,22 +15,32 @@
       </el-dropdown>
     </div>
 
-    <!-- 侧边栏 -->
+    <!-- 移动端侧边栏抽屉 -->
     <el-drawer
       v-model="drawerVisible"
       direction="ltr"
       :with-header="false"
+      size="220px"
       v-if="isMobile"
+      class="mobile-drawer"
     >
       <sidebar-menu @select="drawerVisible = false" />
     </el-drawer>
 
+    <!-- 桌面端布局 -->
     <el-container v-else class="desktop-layout">
-      <el-aside width="220px">
+      <el-aside :width="isCollapsed ? '64px' : '220px'" class="sidebar">
         <div class="logo-wrapper">
-          <span class="logo">{{ appTitle }}</span>
+          <span class="logo" v-show="!isCollapsed">{{ appTitle }}</span>
+          <el-icon v-show="isCollapsed" class="logo-icon"><Calendar /></el-icon>
         </div>
-        <sidebar-menu />
+        <!-- 折叠按钮 -->
+        <div class="collapse-btn" @click="toggleCollapse">
+          <el-icon :size="20">
+            <component :is="isCollapsed ? 'Expand' : 'Fold'" />
+          </el-icon>
+        </div>
+        <sidebar-menu :is-collapsed="isCollapsed" />
       </el-aside>
       <el-main>
         <div class="header">
@@ -68,7 +78,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { Menu, UserFilled } from '@element-plus/icons-vue'
+import { Menu, UserFilled, Fold, Expand, Calendar } from '@element-plus/icons-vue'
 import SidebarMenu from '@/components/SidebarMenu.vue'
 
 const router = useRouter()
@@ -78,10 +88,15 @@ const userStore = useUserStore()
 const appTitle = '排课表系统'
 const drawerVisible = ref(false)
 const windowWidth = ref(window.innerWidth)
+const isCollapsed = ref(false)
 
 const isMobile = computed(() => windowWidth.value < 768)
 
 const currentRouteName = computed(() => route.meta?.title || route.name)
+
+const toggleCollapse = () => {
+  isCollapsed.value = !isCollapsed.value
+}
 
 const handleCommand = (command) => {
   if (command === 'logout') {
@@ -111,9 +126,11 @@ onUnmounted(() => {
   height: 100%;
 }
 
-.el-aside {
+.sidebar {
   background: #304156;
   color: #fff;
+  transition: width 0.3s ease;
+  overflow: hidden;
 }
 
 .logo-wrapper {
@@ -128,6 +145,27 @@ onUnmounted(() => {
   font-size: 18px;
   font-weight: bold;
   color: #fff;
+}
+
+.logo-icon {
+  font-size: 24px;
+  color: #fff;
+}
+
+.collapse-btn {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #bfcbd9;
+  border-bottom: 1px solid #3a4a5b;
+  transition: all 0.3s;
+}
+
+.collapse-btn:hover {
+  background-color: #263445;
+  color: #409eff;
 }
 
 .el-main {
@@ -177,5 +215,13 @@ onUnmounted(() => {
   padding: 15px;
   min-height: calc(100vh - 50px);
   background: #f0f2f5;
+}
+</style>
+
+<style>
+/* 移动端抽屉样式 - 需要全局样式覆盖 el-drawer 内边距 */
+.mobile-drawer .el-drawer__body {
+  padding: 0 !important;
+  background-color: #304156;
 }
 </style>

@@ -206,15 +206,16 @@ async def assign_students(
         if student.org_id != course.org_id:
             raise HTTPException(status_code=400, detail=f"学生 {student.name} 不属于本机构")
 
-    # 添加关联（保留已有的，添加新的）
-    existing_ids = {cs.student_id for cs in course.course_students}
+    # 清除旧关联
+    db.query(CourseStudent).filter(CourseStudent.course_id == course_id).delete()
+
+    # 添加新关联
     for student_id in request.student_ids:
-        if student_id not in existing_ids:
-            cs = CourseStudent(
-                course_id=course_id,
-                student_id=student_id
-            )
-            db.add(cs)
+        cs = CourseStudent(
+            course_id=course_id,
+            student_id=student_id
+        )
+        db.add(cs)
 
     db.commit()
 

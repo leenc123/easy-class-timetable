@@ -95,6 +95,26 @@
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" rows="2" placeholder="请输入描述" />
         </el-form-item>
+        <el-form-item label="授课教师" prop="teacher_ids">
+          <el-select v-model="form.teacher_ids" multiple placeholder="请选择教师" style="width: 100%">
+            <el-option
+              v-for="t in teacherOptions"
+              :key="t.id"
+              :label="t.name"
+              :value="t.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="选课学生" prop="student_ids">
+          <el-select v-model="form.student_ids" multiple placeholder="请选择学生" style="width: 100%" filterable>
+            <el-option
+              v-for="s in studentOptions"
+              :key="s.id"
+              :label="`${s.name} (${s.grade || ''})`"
+              :value="s.id"
+            />
+          </el-select>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -180,7 +200,9 @@ const form = reactive({
   duration_minutes: 60,
   min_students: 1,
   max_students: 30,
-  description: ''
+  description: '',
+  teacher_ids: [],
+  student_ids: []
 })
 
 const rules = {
@@ -199,6 +221,8 @@ const resetForm = () => {
   form.min_students = 1
   form.max_students = 30
   form.description = ''
+  form.teacher_ids = []
+  form.student_ids = []
   formRef.value?.resetFields()
 }
 
@@ -237,16 +261,22 @@ const fetchOptions = async () => {
   studentOptions.value = students.data || []
 }
 
-const handleAdd = () => {
+const handleAdd = async () => {
   resetForm()
   isEdit.value = false
+  await fetchOptions()
   dialogVisible.value = true
 }
 
-const handleEdit = (row) => {
+const handleEdit = async (row) => {
   resetForm()
   isEdit.value = true
-  Object.assign(form, row)
+  await fetchOptions()
+  Object.assign(form, {
+    ...row,
+    teacher_ids: row.teachers || [],
+    student_ids: row.students || []
+  })
   dialogVisible.value = true
 }
 
@@ -301,11 +331,31 @@ const handleSubmit = async () => {
       delete submitData.org_id
     }
 
+    // 移除关联数据，单独处理
+    delete submitData.teacher_ids
+    delete submitData.student_ids
+
+    let courseId = form.id
+
     if (isEdit.value) {
       await courseApi.update(form.id, submitData)
     } else {
-      await courseApi.create(submitData)
+      const res = await courseApi.create(submitData)
+      courseId = res.data?.id
     }
+
+    // 保存教师和学生关联
+    if (form.teacher_ids.length > 0 && courseId) {
+      await courseApi.assignTeachers(courseId, {
+        teacher_ids: form.teacher_ids
+      })
+    }
+    if (form.student_ids.length > 0 && courseId) {
+      await courseApi.assignStudents(courseId, {
+        student_ids: form.student_ids
+      })
+    }
+
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
     fetchData()

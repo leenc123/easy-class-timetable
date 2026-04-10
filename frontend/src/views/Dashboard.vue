@@ -44,8 +44,10 @@
         <el-card>
           <template #header>
             <div class="schedule-header">
-              <span class="schedule-title">今日课表</span>
-              <span class="schedule-date">{{ todayDate }}</span>
+              <div class="header-left">
+                <span class="schedule-title">今日课表</span>
+                <span class="schedule-date">{{ todayDate }}</span>
+              </div>
               <el-button type="primary" link @click="goToSchedule">查看全部</el-button>
             </div>
           </template>
@@ -54,57 +56,82 @@
             <el-icon class="is-loading" :size="32"><Loading /></el-icon>
           </div>
 
-          <div v-else-if="todaySchedule.length === 0" class="empty-container">
-            <el-empty description="今日暂无课程安排" />
+          <div v-else-if="timeSlots.length === 0" class="empty-container">
+            <el-empty description="请先在排课周期中配置时间段" />
           </div>
 
-          <div v-else class="schedule-timeline">
-            <div
-              v-for="item in todaySchedule"
-              :key="item.id"
-              class="schedule-item"
-              :class="{'schedule-item-completed': item.status === 'completed', 'schedule-item-current': isCurrentSession(item)}"
-            >
-              <div class="schedule-time">
-                <div class="time-slot">{{ item.time_slot_name || `第${item.time_slot_id}节` }}</div>
-                <div class="time-range">{{ item.start_time }} - {{ item.end_time }}</div>
-              </div>
-              <div class="schedule-content">
-                <div class="course-name">{{ item.course_name }}</div>
-                <div class="course-info">
-                  <span class="info-item">
-                    <el-icon><User /></el-icon>
-                    {{ item.teacher_name }}
-                  </span>
-                  <span class="info-item">
-                    <el-icon><Location /></el-icon>
-                    {{ item.classroom_name }}
-                  </span>
-                  <span class="info-item">
-                    <el-icon><Avatar /></el-icon>
-                    {{ item.student_count }}人
-                  </span>
-                </div>
-              </div>
-              <div class="schedule-status">
-                <el-tag :type="getStatusType(item.status)" size="small">
-                  {{ getStatusText(item.status) }}
-                </el-tag>
-              </div>
-            </div>
+          <div v-else-if="teachers.length === 0" class="empty-container">
+            <el-empty description="暂无教师，请先添加教师" />
+          </div>
+
+          <div v-else class="schedule-table-wrapper">
+            <table class="schedule-table">
+              <thead>
+                <tr>
+                  <th class="header-cell header-teacher">教师</th>
+                  <th
+                    v-for="slot in timeSlots"
+                    :key="slot.id"
+                    class="header-cell header-time"
+                  >
+                    <div class="time-name">{{ slot.name }}</div>
+                    <div class="time-range">{{ slot.start_time }}-{{ slot.end_time }}</div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="teacher in teachers" :key="teacher.id">
+                  <td class="cell-teacher">{{ teacher.name }}</td>
+                  <td
+                    v-for="slot in timeSlots"
+                    :key="slot.id"
+                    class="cell-content"
+                    :class="getCellClass(teacher.id, slot.id)"
+                  >
+                    <div
+                      v-if="getSession(teacher.id, slot.id)"
+                      class="session-card"
+                      @click="showSessionDetail(getSession(teacher.id, slot.id))"
+                    >
+                      <div class="course-name">{{ getSession(teacher.id, slot.id).course_name }}</div>
+                      <div class="classroom-name">{{ getSession(teacher.id, slot.id).classroom_name }}</div>
+                      <div class="student-count">{{ getSession(teacher.id, slot.id).student_count }}人</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 课程详情弹窗 -->
+    <el-dialog v-model="detailVisible" title="课程详情" width="400px">
+      <div v-if="currentSession" class="session-detail">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="课程">{{ currentSession.course_name }}</el-descriptions-item>
+          <el-descriptions-item label="教师">{{ currentSession.teacher_name }}</el-descriptions-item>
+          <el-descriptions-item label="教室">{{ currentSession.classroom_name }}</el-descriptions-item>
+          <el-descriptions-item label="时间">{{ currentSession.time_slot_name }}</el-descriptions-item>
+          <el-descriptions-item label="学生数">{{ currentSession.student_count }}人</el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :type="getStatusType(currentSession.status)" size="small">
+              {{ getStatusText(currentSession.status) }}
+            </el-tag>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { scheduleApi } from '@/api/schedule'
+import { scheduleApi, cycleApi } from '@/api/schedule'
 import { teacherApi, studentApi, courseApi } from '@/api/resource'
-import { Reading, User, Avatar, Collection, Location, Loading } from '@element-plus/icons-vue'
+import { Reading, User, Avatar, Collection, Loading } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -116,7 +143,13 @@ const stats = reactive({
   courseCount: 0
 })
 
-const todaySchedule = ref([])
+const timeSlots = ref([])
+const teachers = ref([])
+const sessions = ref([])
+const sessionMap = ref({})
+
+const detailVisible = ref(false)
+const currentSession = ref(null)
 
 const todayDate = computed(() => {
   const today = new Date()
@@ -144,11 +177,20 @@ const getStatusText = (status) => {
   return texts[status] || status
 }
 
-const isCurrentSession = (item) => {
-  if (item.status !== 'scheduled') return false
-  const now = new Date()
-  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  return item.start_time <= currentTime && item.end_time > currentTime
+const getSession = (teacherId, timeSlotId) => {
+  const key = `${teacherId}_${timeSlotId}`
+  return sessionMap.value[key]
+}
+
+const getCellClass = (teacherId, timeSlotId) => {
+  const session = getSession(teacherId, timeSlotId)
+  if (!session) return ''
+  return `cell-${session.status}`
+}
+
+const showSessionDetail = (session) => {
+  currentSession.value = session
+  detailVisible.value = true
 }
 
 const goToSchedule = () => {
@@ -158,26 +200,37 @@ const goToSchedule = () => {
 const fetchData = async () => {
   loading.value = true
   try {
-    // 获取今日课表
     const today = new Date().toISOString().split('T')[0]
-    const scheduleRes = await scheduleApi.getList({
-      start_date: today,
-      end_date: today,
-      page_size: 20
-    })
-    todaySchedule.value = scheduleRes.data || []
-    stats.todaySessions = scheduleRes.total || 0
 
-    // 获取统计数据
-    const [teachers, students, courses] = await Promise.all([
-      teacherApi.getList({ page: 1, page_size: 1 }),
+    // 并行获取所有数据
+    const [slotsRes, teachersRes, scheduleRes, studentsRes, coursesRes] = await Promise.all([
+      cycleApi.getTimeSlots(),
+      teacherApi.getList({ page: 1, page_size: 100 }),
+      scheduleApi.getList({ start_date: today, end_date: today, page_size: 100 }),
       studentApi.getList({ page: 1, page_size: 1 }),
       courseApi.getList({ page: 1, page_size: 1 })
     ])
 
-    stats.teacherCount = teachers.total || 0
-    stats.studentCount = students.total || 0
-    stats.courseCount = courses.total || 0
+    // 时间段按开始时间排序
+    timeSlots.value = (slotsRes.data || []).sort((a, b) => {
+      return a.start_time.localeCompare(b.start_time)
+    })
+
+    teachers.value = teachersRes.data || []
+    sessions.value = scheduleRes.data || []
+
+    // 构建课程映射表 (teacher_id + time_slot_id -> session)
+    const map = {}
+    sessions.value.forEach(session => {
+      const key = `${session.teacher_id}_${session.time_slot_id}`
+      map[key] = session
+    })
+    sessionMap.value = map
+
+    stats.todaySessions = scheduleRes.total || 0
+    stats.teacherCount = teachersRes.total || 0
+    stats.studentCount = studentsRes.total || 0
+    stats.courseCount = coursesRes.total || 0
   } catch (error) {
     console.error('获取数据失败:', error)
   } finally {
@@ -215,6 +268,12 @@ onMounted(() => {
   justify-content: space-between;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .schedule-title {
   font-size: 16px;
   font-weight: 600;
@@ -231,107 +290,141 @@ onMounted(() => {
   text-align: center;
 }
 
-.schedule-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.schedule-table-wrapper {
+  overflow-x: auto;
 }
 
-.schedule-item {
-  display: flex;
-  align-items: center;
-  padding: 16px;
-  background: #f8fafc;
-  border-radius: 8px;
-  border-left: 4px solid #409eff;
-  transition: all 0.3s;
+.schedule-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  min-width: 600px;
 }
 
-.schedule-item:hover {
-  background: #f0f7ff;
-}
-
-.schedule-item-completed {
-  border-left-color: #67c23a;
-  background: #f0f9eb;
-}
-
-.schedule-item-current {
-  border-left-color: #e6a23c;
-  background: #fdf6ec;
-  box-shadow: 0 2px 8px rgba(230, 162, 60, 0.2);
-}
-
-.schedule-time {
-  width: 100px;
-  flex-shrink: 0;
+.header-cell {
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  padding: 12px 8px;
   text-align: center;
-}
-
-.time-slot {
-  font-size: 16px;
   font-weight: 600;
   color: #303133;
+}
+
+.header-teacher {
+  width: 100px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f5f7fa;
+}
+
+.header-time {
+  min-width: 120px;
+}
+
+.time-name {
+  font-size: 14px;
+  margin-bottom: 4px;
 }
 
 .time-range {
   font-size: 12px;
   color: #909399;
-  margin-top: 4px;
+  font-weight: normal;
 }
 
-.schedule-content {
-  flex: 1;
-  padding: 0 20px;
+.cell-teacher {
+  border: 1px solid #ebeef5;
+  padding: 8px;
+  text-align: center;
+  font-weight: 500;
+  color: #303133;
+  background: #fafafa;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.cell-content {
+  border: 1px solid #ebeef5;
+  padding: 4px;
+  min-height: 80px;
+  vertical-align: top;
+}
+
+.cell-scheduled {
+  background: #ecf5ff;
+}
+
+.cell-completed {
+  background: #f0f9eb;
+}
+
+.cell-cancelled {
+  background: #fef0f0;
+}
+
+.cell-rescheduled {
+  background: #fdf6ec;
+}
+
+.session-card {
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  height: 100%;
+}
+
+.session-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .course-name {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: #303133;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.course-info {
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
+.classroom-name {
+  font-size: 12px;
   color: #606266;
+  margin-bottom: 2px;
 }
 
-.info-item .el-icon {
+.student-count {
+  font-size: 12px;
   color: #909399;
 }
 
-.schedule-status {
-  flex-shrink: 0;
+.session-detail {
+  padding: 10px 0;
 }
 
 @media (max-width: 768px) {
-  .schedule-item {
+  .header-left {
     flex-direction: column;
     align-items: flex-start;
+    gap: 4px;
   }
 
-  .schedule-time {
-    width: auto;
-    margin-bottom: 8px;
+  .schedule-table {
+    font-size: 12px;
   }
 
-  .schedule-content {
-    padding: 0;
-    margin-bottom: 8px;
+  .header-time {
+    min-width: 100px;
   }
 
-  .schedule-status {
-    margin-top: 8px;
+  .course-name {
+    font-size: 12px;
   }
 }
 </style>
