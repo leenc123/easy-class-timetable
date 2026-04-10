@@ -8,7 +8,7 @@ from datetime import date
 
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.models.schedule import ClassSession, SessionStatus, SessionCheckin
+from app.models.schedule import ClassSession, SessionStatus, SessionCheckin, SessionStudent
 from app.models.cycle import TimeSlot
 from app.models.conflict import SchedulingConflict, ConflictType
 from app.schemas.schedule import (
@@ -76,7 +76,9 @@ async def list_sessions(
         session_data.time_slot_name = item.time_slot.name if item.time_slot else None
         session_data.start_time = item.time_slot.start_time if item.time_slot else None
         session_data.end_time = item.time_slot.end_time if item.time_slot else None
-        session_data.student_count = len(item.student_attendances) if item.student_attendances else 0
+        # 从 session_students 获取学生ID列表
+        session_data.student_ids = [ss.student_id for ss in item.session_students] if item.session_students else []
+        session_data.student_count = len(session_data.student_ids)
 
         # 添加盘点信息
         if item.checkin:
@@ -145,13 +147,12 @@ async def create_session(
 
     # 添加学生
     if request.student_ids:
-        from app.models.schedule import StudentAttendance
         for student_id in request.student_ids:
-            attendance = StudentAttendance(
+            session_student = SessionStudent(
                 session_id=session.id,
                 student_id=student_id
             )
-            db.add(attendance)
+            db.add(session_student)
 
     db.commit()
 
@@ -202,16 +203,15 @@ async def update_session(
 
     # 更新学生列表
     if request.student_ids is not None:
-        from app.models.schedule import StudentAttendance
         # 删除旧的学生记录
-        db.query(StudentAttendance).filter(StudentAttendance.session_id == session_id).delete()
+        db.query(SessionStudent).filter(SessionStudent.session_id == session_id).delete()
         # 添加新的学生记录
         for student_id in request.student_ids:
-            attendance = StudentAttendance(
+            session_student = SessionStudent(
                 session_id=session_id,
                 student_id=student_id
             )
-            db.add(attendance)
+            db.add(session_student)
 
     db.commit()
     db.refresh(session)
@@ -224,7 +224,8 @@ async def update_session(
     session_data.time_slot_name = session.time_slot.name if session.time_slot else None
     session_data.start_time = session.time_slot.start_time if session.time_slot else None
     session_data.end_time = session.time_slot.end_time if session.time_slot else None
-    session_data.student_count = len(session.student_attendances) if session.student_attendances else 0
+    session_data.student_ids = [ss.student_id for ss in session.session_students] if session.session_students else []
+    session_data.student_count = len(session_data.student_ids)
 
     return ResponseBase(
         data=session_data,
@@ -374,13 +375,12 @@ async def batch_create_sessions(
 
             # 添加学生
             if request.student_ids:
-                from app.models.schedule import StudentAttendance
                 for student_id in request.student_ids:
-                    attendance = StudentAttendance(
+                    session_student = SessionStudent(
                         session_id=session.id,
                         student_id=student_id
                     )
-                    db.add(attendance)
+                    db.add(session_student)
 
             created_count += 1
 

@@ -27,5 +27,6 @@ class Student(Base):
     organization = relationship("Organization", back_populates="students")
     user = relationship("User", back_populates="student_profiles")
     course_students = relationship("CourseStudent", back_populates="student")
+    session_students = relationship("SessionStudent", back_populates="student")
     session_attendances = relationship("StudentAttendance", back_populates="student")
     subject_hours = relationship("StudentSubjectHours", back_populates="student", cascade="all, delete-orphan")

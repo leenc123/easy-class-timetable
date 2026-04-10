@@ -39,8 +39,23 @@ class ClassSession(Base):
     classroom = relationship("Classroom", back_populates="sessions")
     cycle = relationship("SchedulingCycle", back_populates="sessions")
     time_slot = relationship("TimeSlot", back_populates="sessions")
+    session_students = relationship("SessionStudent", back_populates="session")
     student_attendances = relationship("StudentAttendance", back_populates="session")
     checkin = relationship("SessionCheckin", uselist=False, back_populates="session")
+
+
+class SessionStudent(Base):
+    """课程实例-学生关联表"""
+    __tablename__ = "session_students"
+
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    session_id = Column(BigInteger, ForeignKey("class_sessions.id", ondelete="CASCADE"), nullable=False, comment="课程实例ID")
+    student_id = Column(BigInteger, ForeignKey("students.id", ondelete="CASCADE"), nullable=False, comment="学生ID")
+    enrolled_at = Column(TIMESTAMP, server_default=func.now(), comment="选课时间")
+
+    # 关联关系
+    session = relationship("ClassSession", back_populates="session_students")
+    student = relationship("Student", back_populates="session_students")
 
 
 class StudentAttendance(Base):

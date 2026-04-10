@@ -122,6 +122,7 @@ class SessionResponse(BaseModel):
     end_time: Optional[str] = None
     status: str
     notes: Optional[str]
+    student_ids: Optional[List[int]] = None
     student_count: Optional[int] = None
     checkin: Optional['CheckinResponse'] = None
     created_at: datetime

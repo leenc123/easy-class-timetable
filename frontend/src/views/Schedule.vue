@@ -290,7 +290,7 @@ const handleEdit = (row) => {
   form.classroom_id = row.classroom_id
   form.session_date = row.session_date
   form.time_slot_id = row.time_slot_id
-  form.student_ids = []
+  form.student_ids = row.student_ids || []
   form.notes = row.notes || ''
   conflictInfo.value = { has_conflict: false, conflicts: [] }
   isEdit.value = true

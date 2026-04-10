@@ -9,7 +9,7 @@ from app.models.student import Student
 from app.models.student_subject_hours import StudentSubjectHours
 from app.models.course import Course, CourseTeacher, CourseStudent, CourseStatus
 from app.models.cycle import SchedulingCycle, CycleDate, TimeSlot
-from app.models.schedule import ClassSession, StudentAttendance, SessionCheckin, SessionStatus
+from app.models.schedule import ClassSession, SessionStudent, StudentAttendance, SessionCheckin, SessionStatus
 from app.models.conflict import SchedulingConflict, ConflictType
 
 __all__ = [
@@ -21,6 +21,6 @@ __all__ = [
     "StudentSubjectHours",
     "Course", "CourseTeacher", "CourseStudent", "CourseStatus",
     "SchedulingCycle", "CycleDate", "TimeSlot",
-    "ClassSession", "StudentAttendance", "SessionCheckin", "SessionStatus",
+    "ClassSession", "SessionStudent", "StudentAttendance", "SessionCheckin", "SessionStatus",
     "SchedulingConflict", "ConflictType",
 ]
