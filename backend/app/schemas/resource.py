@@ -197,3 +197,32 @@ class CourseTeacherAssign(BaseModel):
 
 class CourseStudentAssign(BaseModel):
     student_ids: List[int]
+
+
+# ============ 学生学科学时 ============
+class StudentSubjectHoursCreate(BaseModel):
+    subject: str = Field(..., max_length=50)
+    total_hours: int = Field(..., ge=0, description="总学时（分钟）")
+
+
+class StudentSubjectHoursUpdate(BaseModel):
+    total_hours: Optional[int] = Field(None, ge=0, description="总学时（分钟）")
+    remaining_hours: Optional[int] = Field(None, ge=0, description="剩余学时（分钟）")
+
+
+class StudentSubjectHoursResponse(BaseModel):
+    id: int
+    student_id: int
+    subject: str
+    total_hours: int
+    remaining_hours: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class StudentResponseWithHours(StudentResponse):
+    """学生响应（包含学时信息）"""
+    subject_hours: Optional[List[StudentSubjectHoursResponse]] = None

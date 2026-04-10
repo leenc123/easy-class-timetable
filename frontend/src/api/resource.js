@@ -71,6 +71,23 @@ export const studentApi = {
 
   delete(id) {
     return api.delete(`/students/${id}`)
+  },
+
+  // 学科学时管理
+  getSubjectHours(studentId) {
+    return api.get(`/students/${studentId}/subject-hours`)
+  },
+
+  createSubjectHours(studentId, data) {
+    return api.post(`/students/${studentId}/subject-hours`, data)
+  },
+
+  updateSubjectHours(studentId, hoursId, data) {
+    return api.put(`/students/${studentId}/subject-hours/${hoursId}`, data)
+  },
+
+  deleteSubjectHours(studentId, hoursId) {
+    return api.delete(`/students/${studentId}/subject-hours/${hoursId}`)
   }
 }
 

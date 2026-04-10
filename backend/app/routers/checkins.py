@@ -6,12 +6,45 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.models.schedule import ClassSession, SessionCheckin
+from app.models.schedule import ClassSession, SessionCheckin, StudentAttendance, SessionStatus
+from app.models.student_subject_hours import StudentSubjectHours
 from app.schemas.schedule import CheckinCreate, CheckinResponse
 from app.schemas.base import ResponseBase
 from app.services.auth import require_role, get_current_user, check_org_access
 
 router = APIRouter()
+
+
+def deduct_student_hours(db: Session, session: ClassSession):
+    """扣除学生的学时"""
+    if session.status != SessionStatus.COMPLETED:
+        return
+
+    # 获取课程的时长和学科
+    course = session.course
+    if not course:
+        return
+
+    duration_minutes = course.duration_minutes
+    subject = course.subject
+
+    # 获取该课程的学生
+    attendances = db.query(StudentAttendance).filter(
+        StudentAttendance.session_id == session.id
+    ).all()
+
+    for attendance in attendances:
+        # 查找学生对该学科的学时配置
+        subject_hours = db.query(StudentSubjectHours).filter(
+            StudentSubjectHours.student_id == attendance.student_id,
+            StudentSubjectHours.subject == subject
+        ).first()
+
+        if subject_hours and subject_hours.remaining_hours > 0:
+            # 扣除学时
+            subject_hours.remaining_hours -= duration_minutes
+            if subject_hours.remaining_hours < 0:
+                subject_hours.remaining_hours = 0
 
 
 @router.post("", response_model=ResponseBase[CheckinResponse])
@@ -57,6 +90,12 @@ async def create_checkin(
         db.add(checkin)
         db.commit()
         db.refresh(checkin)
+
+    # 如果有实际到场人数，标记课程完成并扣除学时
+    if request.actual_count > 0:
+        session.status = SessionStatus.COMPLETED
+        db.commit()
+        deduct_student_hours(db, session)
 
     response = CheckinResponse.model_validate(checkin)
     response.teacher_name = checkin.teacher.name if checkin.teacher else None

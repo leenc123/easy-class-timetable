@@ -8,7 +8,12 @@
       "Bash(mysql:*)",
       "Bash(cmd.exe:*)",
       "Bash(powershell.exe:*)",
-      "Bash(./venv/Scripts/python.exe scripts/init_db.py)"
+      "Bash(./venv/Scripts/python.exe scripts/init_db.py)",
+      "Bash(python -c \"from app.models import StudentSubjectHours; print\\('Model imported successfully'\\)\")",
+      "Bash(python3 -m py_compile app/models/student_subject_hours.py)",
+      "Bash(python -m py_compile backend/app/models/student_subject_hours.py)",
+      "Bash(python -m py_compile backend/app/routers/students.py)",
+      "Bash(python -m py_compile backend/app/routers/checkins.py)"
     ]
   }
 }
