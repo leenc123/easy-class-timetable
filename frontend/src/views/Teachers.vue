@@ -78,6 +78,13 @@
             <el-option label="物理" value="物理" />
             <el-option label="化学" value="化学" />
             <el-option label="生物" value="生物" />
+            <el-option label="历史" value="历史" />
+            <el-option label="地理" value="地理" />
+            <el-option label="政治" value="政治" />
+            <el-option label="音乐" value="音乐" />
+            <el-option label="美术" value="美术" />
+            <el-option label="体育" value="体育" />
+            <el-option label="信息" value="信息" />
           </el-select>
         </el-form-item>
         <el-form-item label="周课时上限" prop="max_hours_per_week">

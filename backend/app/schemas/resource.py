@@ -104,6 +104,19 @@ class AvailabilityResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    @classmethod
+    def model_validate(cls, obj):
+        data = {
+            'id': obj.id,
+            'teacher_id': obj.teacher_id,
+            'day_of_week': obj.day_of_week,
+            'start_time': str(obj.start_time) if hasattr(obj.start_time, 'strftime') else obj.start_time,
+            'end_time': str(obj.end_time) if hasattr(obj.end_time, 'strftime') else obj.end_time,
+            'is_recurring': obj.is_recurring,
+            'specific_date': obj.specific_date
+        }
+        return cls(**data)
+
 
 # ============ 学生 ============
 class StudentCreate(BaseModel):

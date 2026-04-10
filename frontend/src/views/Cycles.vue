@@ -129,10 +129,10 @@
           <el-input v-model="timeSlotForm.name" placeholder="如：第1节、早读" />
         </el-form-item>
         <el-form-item label="开始时间" prop="start_time">
-          <el-time-select v-model="timeSlotForm.start_time" placeholder="选择时间" style="width: 100%" />
+          <el-time-select v-model="timeSlotForm.start_time" placeholder="选择时间" style="width: 100%" start="08:00" end="21:00" step="01:00" />
         </el-form-item>
         <el-form-item label="结束时间" prop="end_time">
-          <el-time-select v-model="timeSlotForm.end_time" placeholder="选择时间" style="width: 100%" />
+          <el-time-select v-model="timeSlotForm.end_time" placeholder="选择时间" style="width: 100%" start="08:00" end="21:00" step="01:00" />
         </el-form-item>
         <el-form-item label="序号" prop="display_order">
           <el-input-number v-model="timeSlotForm.display_order" :min="1" />

@@ -43,28 +43,56 @@
       <el-col :span="24">
         <el-card>
           <template #header>
-            <span>今日课表</span>
-            <el-button type="primary" link @click="goToSchedule">查看全部</el-button>
+            <div class="schedule-header">
+              <span class="schedule-title">今日课表</span>
+              <span class="schedule-date">{{ todayDate }}</span>
+              <el-button type="primary" link @click="goToSchedule">查看全部</el-button>
+            </div>
           </template>
-          <el-table :data="todaySchedule" v-loading="loading" stripe>
-            <el-table-column prop="session_date" label="日期" width="120" />
-            <el-table-column label="时间" width="120">
-              <template #default="{ row }">
-                {{ row.start_time }} - {{ row.end_time }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="course_name" label="课程" />
-            <el-table-column prop="teacher_name" label="教师" width="100" />
-            <el-table-column prop="classroom_name" label="教室" width="120" />
-            <el-table-column prop="student_count" label="学生数" width="80" />
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)">
-                  {{ getStatusText(row.status) }}
+
+          <div v-if="loading" class="loading-container">
+            <el-icon class="is-loading" :size="32"><Loading /></el-icon>
+          </div>
+
+          <div v-else-if="todaySchedule.length === 0" class="empty-container">
+            <el-empty description="今日暂无课程安排" />
+          </div>
+
+          <div v-else class="schedule-timeline">
+            <div
+              v-for="item in todaySchedule"
+              :key="item.id"
+              class="schedule-item"
+              :class="{'schedule-item-completed': item.status === 'completed', 'schedule-item-current': isCurrentSession(item)}"
+            >
+              <div class="schedule-time">
+                <div class="time-slot">{{ item.time_slot_name || `第${item.time_slot_id}节` }}</div>
+                <div class="time-range">{{ item.start_time }} - {{ item.end_time }}</div>
+              </div>
+              <div class="schedule-content">
+                <div class="course-name">{{ item.course_name }}</div>
+                <div class="course-info">
+                  <span class="info-item">
+                    <el-icon><User /></el-icon>
+                    {{ item.teacher_name }}
+                  </span>
+                  <span class="info-item">
+                    <el-icon><Location /></el-icon>
+                    {{ item.classroom_name }}
+                  </span>
+                  <span class="info-item">
+                    <el-icon><Avatar /></el-icon>
+                    {{ item.student_count }}人
+                  </span>
+                </div>
+              </div>
+              <div class="schedule-status">
+                <el-tag :type="getStatusType(item.status)" size="small">
+                  {{ getStatusText(item.status) }}
                 </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+              </div>
+            </div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -72,11 +100,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { scheduleApi } from '@/api/schedule'
 import { teacherApi, studentApi, courseApi } from '@/api/resource'
-import { Reading, User, Avatar, Collection } from '@element-plus/icons-vue'
+import { Reading, User, Avatar, Collection, Location, Loading } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -90,6 +118,12 @@ const stats = reactive({
 
 const todaySchedule = ref([])
 
+const todayDate = computed(() => {
+  const today = new Date()
+  const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+  return `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日 ${weekDays[today.getDay()]}`
+})
+
 const getStatusType = (status) => {
   const types = {
     scheduled: '',
@@ -102,12 +136,19 @@ const getStatusType = (status) => {
 
 const getStatusText = (status) => {
   const texts = {
-    scheduled: '已安排',
+    scheduled: '待上课',
     completed: '已完成',
     cancelled: '已取消',
     rescheduled: '已调课'
   }
   return texts[status] || status
+}
+
+const isCurrentSession = (item) => {
+  if (item.status !== 'scheduled') return false
+  const now = new Date()
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  return item.start_time <= currentTime && item.end_time > currentTime
 }
 
 const goToSchedule = () => {
@@ -122,7 +163,7 @@ const fetchData = async () => {
     const scheduleRes = await scheduleApi.getList({
       start_date: today,
       end_date: today,
-      page_size: 10
+      page_size: 20
     })
     todaySchedule.value = scheduleRes.data || []
     stats.todaySessions = scheduleRes.total || 0
@@ -166,5 +207,131 @@ onMounted(() => {
 :deep(.el-statistic__content) {
   font-size: 28px;
   font-weight: bold;
+}
+
+.schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.schedule-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.schedule-date {
+  color: #909399;
+  font-size: 14px;
+}
+
+.loading-container,
+.empty-container {
+  padding: 40px 0;
+  text-align: center;
+}
+
+.schedule-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.schedule-item {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 4px solid #409eff;
+  transition: all 0.3s;
+}
+
+.schedule-item:hover {
+  background: #f0f7ff;
+}
+
+.schedule-item-completed {
+  border-left-color: #67c23a;
+  background: #f0f9eb;
+}
+
+.schedule-item-current {
+  border-left-color: #e6a23c;
+  background: #fdf6ec;
+  box-shadow: 0 2px 8px rgba(230, 162, 60, 0.2);
+}
+
+.schedule-time {
+  width: 100px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.time-slot {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.time-range {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+}
+
+.schedule-content {
+  flex: 1;
+  padding: 0 20px;
+}
+
+.course-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.course-info {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #606266;
+}
+
+.info-item .el-icon {
+  color: #909399;
+}
+
+.schedule-status {
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .schedule-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .schedule-time {
+    width: auto;
+    margin-bottom: 8px;
+  }
+
+  .schedule-content {
+    padding: 0;
+    margin-bottom: 8px;
+  }
+
+  .schedule-status {
+    margin-top: 8px;
+  }
 }
 </style>
