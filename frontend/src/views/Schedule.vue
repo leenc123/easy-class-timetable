@@ -122,23 +122,47 @@
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit" :disabled="conflictInfo.has_conflict">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 导出机构选择弹窗 -->
+    <el-dialog v-model="exportDialogVisible" title="选择导出机构" width="400px">
+      <el-form label-width="80px">
+        <el-form-item label="所属机构" required>
+          <el-select v-model="exportOrgId" placeholder="请选择机构" style="width: 100%" :loading="orgLoading">
+            <el-option v-for="org in orgOptions" :key="org.id" :label="org.name" :value="org.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="exportDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmExport">确定导出</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { scheduleApi, cycleApi, exportApi } from '@/api/schedule'
 import { courseApi, teacherApi, studentApi, classroomApi } from '@/api/resource'
+import { organizationApi } from '@/api/organization'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
+const isSuperAdmin = computed(() => userStore.user?.role === 'super_admin')
 const loading = ref(false)
 const submitLoading = ref(false)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const tableData = ref([])
 const formRef = ref()
+
+// 导出机构选择
+const exportDialogVisible = ref(false)
+const exportType = ref('')
+const exportOrgId = ref(null)
+const orgOptions = ref([])
+const orgLoading = ref(false)
 
 const dateRange = ref([])
 const filters = reactive({
@@ -303,10 +327,37 @@ const handleExport = async (type) => {
     return
   }
 
+  // 超管需要先选择机构
+  if (isSuperAdmin.value) {
+    exportType.value = type
+    exportOrgId.value = null
+    exportDialogVisible.value = true
+    await fetchOrgOptions()
+  } else {
+    doExport(type)
+  }
+}
+
+const fetchOrgOptions = async () => {
+  orgLoading.value = true
+  try {
+    const res = await organizationApi.getList({ page: 1, page_size: 100 })
+    orgOptions.value = res.data || []
+  } finally {
+    orgLoading.value = false
+  }
+}
+
+const doExport = async (type, orgId = null) => {
   const params = {
     start_date: dateRange.value[0],
     end_date: dateRange.value[1],
     ...filters
+  }
+
+  // 超管导出时添加机构ID
+  if (orgId) {
+    params.org_id = orgId
   }
 
   try {
@@ -323,9 +374,18 @@ const handleExport = async (type) => {
     a.download = `课表_${dateRange.value[0]}_${dateRange.value[1]}.${type === 'pdf' ? 'pdf' : 'xlsx'}`
     a.click()
     URL.revokeObjectURL(url)
+    exportDialogVisible.value = false
   } catch (error) {
     ElMessage.error('导出失败')
   }
+}
+
+const confirmExport = () => {
+  if (!exportOrgId.value) {
+    ElMessage.warning('请选择机构')
+    return
+  }
+  doExport(exportType.value, exportOrgId.value)
 }
 
 onMounted(() => {

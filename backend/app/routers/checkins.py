@@ -17,9 +17,6 @@ router = APIRouter()
 
 def deduct_student_hours(db: Session, session: ClassSession):
     """扣除学生的学时"""
-    if session.status != SessionStatus.COMPLETED:
-        return
-
     # 获取课程的时长和学科
     course = session.course
     if not course:
@@ -88,14 +85,14 @@ async def create_checkin(
             notes=request.notes
         )
         db.add(checkin)
-        db.commit()
-        db.refresh(checkin)
 
     # 如果有实际到场人数，标记课程完成并扣除学时
     if request.actual_count > 0:
         session.status = SessionStatus.COMPLETED
-        db.commit()
         deduct_student_hours(db, session)
+
+    db.commit()
+    db.refresh(checkin) if checkin.id else None
 
     response = CheckinResponse.model_validate(checkin)
     response.teacher_name = checkin.teacher.name if checkin.teacher else None
