@@ -8,12 +8,13 @@ from datetime import date
 
 from app.database import get_db
 from app.models.user import User, UserRole
-from app.models.schedule import ClassSession, SessionStatus
+from app.models.schedule import ClassSession, SessionStatus, SessionCheckin
 from app.models.cycle import TimeSlot
 from app.models.conflict import SchedulingConflict, ConflictType
 from app.schemas.schedule import (
     SessionCreate, SessionUpdate, SessionResponse,
-    BatchSessionCreate, ConflictCheckRequest, ConflictInfo, ConflictResponse
+    BatchSessionCreate, ConflictCheckRequest, ConflictInfo, ConflictResponse,
+    CheckinResponse
 )
 from app.schemas.base import ResponseBase, PaginatedResponse
 from app.services.auth import require_role, get_current_user, check_org_access
@@ -76,6 +77,13 @@ async def list_sessions(
         session_data.start_time = item.time_slot.start_time if item.time_slot else None
         session_data.end_time = item.time_slot.end_time if item.time_slot else None
         session_data.student_count = len(item.student_attendances) if item.student_attendances else 0
+
+        # 添加盘点信息
+        if item.checkin:
+            checkin_data = CheckinResponse.model_validate(item.checkin)
+            checkin_data.teacher_name = item.checkin.teacher.name if item.checkin.teacher else None
+            session_data.checkin = checkin_data
+
         results.append(session_data)
 
     return PaginatedResponse(

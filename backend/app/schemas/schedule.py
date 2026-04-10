@@ -123,6 +123,7 @@ class SessionResponse(BaseModel):
     status: str
     notes: Optional[str]
     student_count: Optional[int] = None
+    checkin: Optional['CheckinResponse'] = None
     created_at: datetime
     updated_at: datetime
 
