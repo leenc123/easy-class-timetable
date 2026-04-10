@@ -7,12 +7,32 @@
       </el-button>
     </div>
 
+    <!-- 筛选条件 -->
+    <el-card style="margin-bottom: 20px">
+      <el-form :inline="true" :model="filters" @submit.prevent="fetchData">
+        <el-form-item label="角色">
+          <el-select v-model="filters.role" placeholder="全部" clearable @change="fetchData">
+            <el-option label="机构管理员" value="org_admin" />
+            <el-option label="教师" value="teacher" />
+            <el-option label="学生/家长" value="student_parent" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="filters.is_active" placeholder="全部" clearable @change="fetchData">
+            <el-option label="启用" :value="true" />
+            <el-option label="禁用" :value="false" />
+          </el-select>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="fetchData">查询</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
     <el-card>
       <el-table :data="tableData" v-loading="loading" stripe>
         <el-table-column prop="username" label="用户名" width="120" />
         <el-table-column prop="real_name" label="姓名" width="100" />
-        <el-table-column prop="phone" label="电话" width="130" />
-        <el-table-column prop="email" label="邮箱" />
         <el-table-column prop="role" label="角色" width="120">
           <template #default="{ row }">
             <el-tag :type="getRoleType(row.role)">{{ getRoleText(row.role) }}</el-tag>
@@ -29,7 +49,7 @@
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" link @click="handleDelete(row)">禁用</el-button>
+            <el-button type="danger" link @click="handleDelete(row)" :disabled="!row.is_active">禁用</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -56,12 +76,6 @@
         </el-form-item>
         <el-form-item label="姓名" prop="real_name">
           <el-input v-model="form.real_name" placeholder="请输入姓名" />
-        </el-form-item>
-        <el-form-item label="电话" prop="phone">
-          <el-input v-model="form.phone" placeholder="请输入电话" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" placeholder="请输入邮箱" />
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%">
@@ -94,6 +108,11 @@ const isEdit = ref(false)
 const tableData = ref([])
 const formRef = ref()
 
+const filters = reactive({
+  role: null,
+  is_active: null
+})
+
 const pagination = reactive({
   page: 1,
   pageSize: 20,
@@ -105,8 +124,6 @@ const form = reactive({
   username: '',
   password: '',
   real_name: '',
-  phone: '',
-  email: '',
   role: 'teacher',
   org_id: null
 })
@@ -131,9 +148,10 @@ const getRoleText = (role) => {
 const fetchData = async () => {
   loading.value = true
   try {
-    const res = await authApi.getList?.({
+    const res = await authApi.getList({
       page: pagination.page,
-      page_size: pagination.pageSize
+      page_size: pagination.pageSize,
+      ...filters
     })
     tableData.value = res.data || []
     pagination.total = res.total || 0
@@ -147,8 +165,6 @@ const handleAdd = () => {
   form.username = ''
   form.password = ''
   form.real_name = ''
-  form.phone = ''
-  form.email = ''
   form.role = 'teacher'
   form.org_id = userStore.user?.org_id
   isEdit.value = false
@@ -158,8 +174,6 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   form.id = row.id
   form.real_name = row.real_name
-  form.phone = row.phone
-  form.email = row.email
   form.role = row.role
   isEdit.value = true
   dialogVisible.value = true
@@ -177,7 +191,10 @@ const handleSubmit = async () => {
   submitLoading.value = true
   try {
     if (isEdit.value) {
-      await authApi.updateUser(form.id, form)
+      await authApi.updateUser(form.id, {
+        real_name: form.real_name,
+        role: form.role
+      })
     } else {
       await authApi.createUser(form)
     }

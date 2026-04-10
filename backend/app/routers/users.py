@@ -50,7 +50,8 @@ async def list_users(
                 role=u.role,
                 org_id=u.org_id,
                 org_name=u.organization.name if u.organization else None,
-                avatar_url=u.avatar_url
+                avatar_url=u.avatar_url,
+                is_active=u.is_active
             ) for u in items
         ],
         total=total,

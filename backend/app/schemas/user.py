@@ -21,6 +21,7 @@ class UserInfo(BaseModel):
     org_id: Optional[int]
     org_name: Optional[str]
     avatar_url: Optional[str]
+    is_active: Optional[bool] = True
 
 
 class LoginResponse(BaseModel):

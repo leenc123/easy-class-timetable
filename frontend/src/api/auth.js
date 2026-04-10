@@ -16,6 +16,11 @@ export const authApi = {
     return api.post('/auth/change-password', data)
   },
 
+  // 获取用户列表
+  getList(params) {
+    return api.get('/users', { params })
+  },
+
   // 创建用户
   createUser(data) {
     return api.post('/auth/users', data)
